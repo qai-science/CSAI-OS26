@@ -1,0 +1,6 @@
+pipes-namedpipes-sharedmemory/shm_writer
+pipes-namedpipes-sharedmemory/shm_reader
+pipes-namedpipes-sharedmemory/pipe_demo
+pipes-namedpipes-sharedmemory/fifo_writer
+pipes-namedpipes-sharedmemory/fifo_reader
+.DS_Store
