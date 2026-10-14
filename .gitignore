@@ -7,3 +7,10 @@ pipes-namedpipes-sharedmemory/fifo_reader
 pipes-namedpipes-sharedmemory/sem_writer
 pipes-namedpipes-sharedmemory/sem_reader
 pipes-namedpipes-sharedmemory/sem_counting
+critical-section/cs_race
+critical-section/cs_peterson
+critical-section/cs_tas
+critical-section/cs_swap
+critical-section/cs_mutex
+critical-section/cs_binsem
+critical-section/sem_order

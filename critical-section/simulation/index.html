@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Critical Section Lab</title>
+<meta name="description" content="Step-by-step simulation of the critical-section problem: race, Peterson, TestAndSet, Swap, mutex and binary semaphores (CSAI-OS26, topics 3.7 to 3.10).">
+<style>
+:root{
+  --bg:#f6f6f4; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6b66; --line:#dcdcd6; --soft:#efefeb;
+  --accent:#1f5fa8; --accent-bg:#e7f0fa; --ok:#2f7d32; --ok-bg:#e6f3e6; --warn:#a15c00; --warn-bg:#fdf0dc;
+  --bad:#b3261e; --bad-bg:#fbe6e4; --dead:#8a8a84; --kernel:#f1efe8;
+  --t0:#1f5fa8; --t0-bg:#dfeaf8; --t1:#b4520a; --t1-bg:#fbe8d8; --chg:#fff3b8;
+  --term:#16181c; --term-ink:#d6d6d0; --term-dim:#7c7f86; --prompt:#7bd88f; --path:#7aa7e0;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121313; --panel:#1b1c1d; --ink:#e8e8e3; --muted:#9a9a93; --line:#33342f; --soft:#242522;
+    --accent:#7fb0ea; --accent-bg:#1b2a3c; --ok:#7cc47f; --ok-bg:#1d2e1e; --warn:#e2a447; --warn-bg:#352813;
+    --bad:#f08a80; --bad-bg:#3a1d1a; --dead:#77776f; --kernel:#202120;
+    --t0:#82b4ee; --t0-bg:#1c2b3e; --t1:#f0a868; --t1-bg:#3a2717; --chg:#4a3f12;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121313; --panel:#1b1c1d; --ink:#e8e8e3; --muted:#9a9a93; --line:#33342f; --soft:#242522;
+  --accent:#7fb0ea; --accent-bg:#1b2a3c; --ok:#7cc47f; --ok-bg:#1d2e1e; --warn:#e2a447; --warn-bg:#352813;
+  --bad:#f08a80; --bad-bg:#3a1d1a; --dead:#77776f; --kernel:#202120;
+  --t0:#82b4ee; --t0-bg:#1c2b3e; --t1:#f0a868; --t1-bg:#3a2717; --chg:#4a3f12;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans)}
+.wrap{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.sub a{color:var(--accent)}
+.theme{font:13px var(--sans);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+nav.tabs button{font:500 14px var(--sans);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav.tabs .n{opacity:.6;margin-right:4px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.bar button,.bar select{font:500 14px var(--sans);padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer}
+.bar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.bar button.t0{background:var(--t0-bg);border-color:var(--t0);color:var(--t0)}
+.bar button.t1{background:var(--t1-bg);border-color:var(--t1);color:var(--t1)}
+.bar button:disabled{opacity:.4;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grp{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.count{font:13px var(--mono);color:var(--muted);margin-left:auto}
+.keys{font-size:12px;color:var(--muted)}
+kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--panel)}
+.grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:12px}
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.card h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card h2 a{color:var(--accent);text-transform:none;letter-spacing:0;font-weight:500;text-decoration:none}
+.code{font:13px/1.75 var(--mono);padding:8px 0}
+.ln{display:flex;align-items:center;white-space:pre;padding-right:10px;border-left:3px solid transparent}
+.ln .no{width:34px;flex:none;text-align:right;padding-right:10px;color:var(--muted);user-select:none}
+.ln .mk{width:58px;flex:none;display:flex;gap:3px}
+.ln .mk span{font:600 10px var(--sans);padding:0 5px;border-radius:4px;line-height:16px}
+.ln .mk .m0{background:var(--t0);color:#fff}.ln .mk .m1{background:var(--t1);color:#fff}
+.ln .src{white-space:pre}
+.ln.r0{background:var(--t0-bg)}.ln.r1{background:var(--t1-bg)}.ln.r01{background:linear-gradient(90deg,var(--t0-bg),var(--t1-bg))}
+.ln.ex{border-left-color:var(--ink)}
+.k{color:#8a3ffc}.s{color:#0f7b52}.c{color:var(--muted);font-style:italic}.f{color:var(--accent);font-weight:600}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .k{color:#c4a3ff}:root:not([data-theme="light"]) .s{color:#86d6a8}}
+:root[data-theme="dark"] .k{color:#c4a3ff}:root[data-theme="dark"] .s{color:#86d6a8}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.legend b{font:600 10px var(--sans);padding:0 5px;border-radius:4px;color:#fff}
+svg.dia{display:block;width:100%;height:auto}
+.explain{padding:14px 16px;min-height:112px}
+.explain p{margin:0}
+.explain .tag{display:inline-block;font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;margin-bottom:8px}
+.tag.t0{color:var(--t0);background:var(--t0-bg)}.tag.t1{color:var(--t1);background:var(--t1-bg)}.tag.n{color:var(--accent);background:var(--accent-bg)}
+code{font:13px var(--mono);background:var(--soft);padding:1px 5px;border-radius:4px}
+.banner{margin:0;padding:9px 14px;font-weight:600;font-size:14px;border-top:1px solid var(--line)}
+.banner.bad{background:var(--bad-bg);color:var(--bad)}.banner.ok{background:var(--ok-bg);color:var(--ok)}.banner.n{background:var(--soft);color:var(--muted)}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+@media (max-width:860px){.row2{grid-template-columns:minmax(0,1fr)}}
+.term{background:var(--term);border-radius:12px;overflow:hidden;border:1px solid #2b2e34}
+.term .tb{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#23262c;color:#b9bbc1;font:12px var(--sans)}
+.term .tb i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.term .tb span{margin-left:6px}
+.term pre{margin:0;padding:10px 14px;font:12.5px/1.6 var(--mono);color:var(--term-ink);white-space:pre-wrap;word-break:break-word;min-height:160px}
+.term .pr{color:var(--prompt)}.term .pa{color:var(--path)}.term .dim{color:var(--term-dim)}.term .bad{color:#ff8a80}.term .good{color:#9be29b}
+.props{padding:12px 14px}
+.props table{width:100%;border-collapse:collapse;font-size:14px}
+.props td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.props tr:last-child td{border-bottom:0}
+.props td:first-child{color:var(--muted);width:44%}
+.yes{color:var(--ok);font-weight:600}.no{color:var(--bad);font-weight:600}.mid{color:var(--warn);font-weight:600}
+.deep{margin-top:12px}
+.deep .body{padding:6px 18px 18px}
+.deep h3{font-size:15px;margin:16px 0 6px;font-weight:650}
+.deep p,.deep li{font-size:14.5px}
+.deep ul{padding-left:20px}
+pre.pseudo{font:12.5px/1.6 var(--mono);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0;overflow-x:auto}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+@media (max-width:860px){.dgrid{grid-template-columns:minmax(0,1fr)}}
+table.cmp{width:100%;border-collapse:collapse;font-size:14px}
+table.cmp th,table.cmp td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+table.cmp th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;background:var(--soft)}
+.tablewrap{overflow-x:auto}
+footer{margin-top:18px;color:var(--muted);font-size:13px}
+footer a{color:var(--accent)}
+.hint{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Critical section lab: race, Peterson, TestAndSet, Swap, mutex and semaphores</h1>
+    <div class="sub">CSAI-OS26 · Topics 3.7 to 3.10 · Simulation of two threads, one instruction at a time · Real C programs in <a href="https://github.com/qai-science/CSAI-OS26/tree/main/critical-section">critical-section/</a></div>
+  </div>
+  <button class="theme" id="theme" type="button" aria-label="Toggle colour theme">Theme</button>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist"></nav>
+
+<div class="bar">
+  <div class="seg" role="group" aria-label="Mode">
+    <button type="button" id="mTour" aria-pressed="true">Guided tour</button>
+    <button type="button" id="mFree" aria-pressed="false">You are the scheduler</button>
+  </div>
+  <div class="grp" id="tourCtl">
+    <button id="reset" type="button" title="Reset (Home)" aria-label="Reset">&#x23EE;</button>
+    <button id="prev" type="button" title="Previous (Left arrow)">&#9664; Prev</button>
+    <button id="play" class="primary" type="button" title="Play / pause (Space)">&#9654; Play</button>
+    <button id="next" type="button" title="Next (Right arrow)">Next &#9654;</button>
+    <select id="speed" aria-label="Speed"><option value="2600">Slow</option><option value="1500" selected>Normal</option><option value="700">Fast</option></select>
+  </div>
+  <div class="grp" id="freeCtl" hidden>
+    <button id="run0" class="t0" type="button">Run T0 &#9654;</button>
+    <button id="run1" class="t1" type="button">Run T1 &#9654;</button>
+    <button id="runR" type="button">Random</button>
+    <button id="undo" type="button">Undo</button>
+    <button id="freset" type="button">Reset</button>
+  </div>
+  <span class="count" id="count"></span>
+</div>
+
+<div class="grid">
+  <section class="card">
+    <h2><span>Code each thread runs</span><a id="srclink" href="#" target="_blank" rel="noopener">Real C version</a></h2>
+    <div class="code" id="code"></div>
+    <div class="legend"><span><b style="background:var(--t0)" id="lg0">T0</b> next line for T0</span><span><b style="background:var(--t1)" id="lg1">T1</b> next line for T1</span><span>dark left edge = line just executed</span></div>
+  </section>
+  <div style="display:grid;gap:12px;align-content:start">
+    <section class="card">
+      <h2><span>Threads and shared memory</span></h2>
+      <div id="dia"></div>
+      <p class="banner n" id="banner"></p>
+    </section>
+    <section class="card">
+      <h2><span>What just happened</span></h2>
+      <div class="explain" id="explain" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<div class="row2">
+  <div class="term"><div class="tb"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span id="termTitle">Real run on the Ubuntu VM</span></div><pre id="real"></pre></div>
+  <section class="card"><h2><span>Does it solve the critical-section problem?</span></h2><div class="props" id="props"></div></section>
+</div>
+
+<section class="card deep"><h2><span id="deepTitle">In depth</span></h2><div class="body" id="deep"></div></section>
+
+<section class="card deep">
+  <h2><span>All seven, measured on the VM (2 threads × 2,000,000 increments, 8-core Intel Core Ultra 5)</span></h2>
+  <div class="tablewrap"><table class="cmp">
+    <tr><th>Program</th><th>Final counter (expected 4,000,000)</th><th>Time</th><th>How a waiting thread waits</th></tr>
+    <tr><td><code>cs_race</code></td><td class="no">2,341,458 to 3,433,927 (lost up to 1.66 M)</td><td>10–43 ms</td><td>It never waits, which is the bug</td></tr>
+    <tr><td><code>cs_peterson plain</code></td><td class="no">3,999,961 to 3,999,988 (lost 12–39)</td><td>~0.9–1.3 s</td><td>Spins. Breaks because the CPU reorders memory</td></tr>
+    <tr><td><code>cs_peterson</code></td><td class="yes">4,000,000</td><td>1.33 s</td><td>Spins (atomics with full fences)</td></tr>
+    <tr><td><code>cs_tas</code></td><td class="yes">4,000,000</td><td>0.41 s</td><td>Spins: 3.2 M failed TestAndSets</td></tr>
+    <tr><td><code>cs_swap</code></td><td class="yes">4,000,000</td><td>0.47 s</td><td>Spins: 4.1 M failed Swaps</td></tr>
+    <tr><td><code>cs_mutex</code></td><td class="yes">4,000,000</td><td>0.56 s</td><td>Sleeps in the kernel (futex) when contended</td></tr>
+    <tr><td><code>cs_binsem</code></td><td class="yes">4,000,000</td><td>1.27 s</td><td>Sleeps in the kernel when the value is 0</td></tr>
+  </table></div>
+  <p class="hint" style="padding:0 14px 12px">The fastest correct lock here is a spinlock, but only because the critical section is one instruction long and both threads have their own core. With long critical sections or more threads than cores, spinning wastes whole time slices and a sleeping lock wins.</p>
+</section>
+
+<footer>
+  Build and run the real programs on Linux: <code>cd critical-section &amp;&amp; make run</code>. Companion simulator: <a href="../../pipes-namedpipes-sharedmemory/simulation/">shared memory, pipes and semaphores</a>.
+</footer>
+</div>
+
+<script>
+const ITER = 2;
+const REPO = "https://github.com/qai-science/CSAI-OS26/blob/main/critical-section/";
+const PS = "$ ";
+const go = (T, n) => { T.pc = n; };
+const B = v => v ? "true" : "false";
+
+/* ---------- shared critical-section body (load, add, store) ---------- */
+function body(lnLoad, afterStore){
+  return [
+    {ln:lnLoad, cs:true, kind:"load", run:(S,T,me,D) => { T.r = S.counter; T.loaded = true; go(T, T.pc+1); return D.names[me]+" loads <code>counter</code> into its register: <code>r = "+T.r+"</code>."; }},
+    {ln:lnLoad+1, cs:true, run:(S,T,me,D) => { T.r++; go(T, T.pc+1); return D.names[me]+" adds 1 in its own register: <code>r = "+T.r+"</code>. Shared memory has not changed yet."; }},
+    {ln:lnLoad+2, cs:true, kind:"store", run:(S,T,me,D) => { const old = S.counter; S.counter = T.r; T.loaded = false; afterStore(T); return D.names[me]+" stores <code>counter = "+T.r+"</code> (it was "+old+")."+(T.r <= old ? " <b>An update was lost:</b> the other thread's increment has been overwritten." : ""); }}
+  ];
+}
+function endRound(T, firstPc){ T.k++; T.pc = T.k < ITER ? firstPc : 99; }
+
+const DEMOS = [
+{ id:"race", label:"The problem: race", file:"cs_race.c", guarded:false, names:["T0","T1"],
+  code:`/* each thread runs this twice */
+for (k = 0; k < 2; k++) {
+    r = counter;        /* load  */
+    r = r + 1;          /* add   */
+    counter = r;        /* store */
+}`,
+  vars:["counter"], init:()=>({counter:0}),
+  prog:()=>{ const b = body(3, T => endRound(T, 0)); return b; },
+  tour:[0,1,0,1,0,1, 0,0,0, 1,1,1],
+  notes:{0:"Two threads share one variable, <code>counter = 0</code>. Each adds 1 twice, so the answer should be <b>4</b>. <code>counter++</code> looks like one step, but the CPU does <b>three</b>: load, add, store. Watch what happens when the scheduler switches threads in the middle.",
+         2:"T1 loads <b>before</b> T0 has stored, so both registers now hold 0. This is the moment both are inside the critical section.",
+         6:"T1 stores 1 on top of T0's 1. Two increments ran, but <code>counter</code> only went up by one. That is a <b>lost update</b>.",
+         12:"Final value: <b>3</b>, not 4. On the real VM the same bug lost up to 1.66 million of 4 million updates. Try the <b>You are the scheduler</b> mode and see how low you can make it go."},
+  props:[["Mutual exclusion","no","Both threads can be between load and store at once"],["Progress","—",""],["Bounded waiting","—",""],["While waiting","—","No one ever waits, which is the problem"]],
+  real:[PS+"./cs_race", "race      : counter =  2341458  expected 4000000  lost 1658542  (10 ms)", PS+"./cs_race", "race      : counter =  3415866  expected 4000000  lost 584134  (23 ms)", PS+"./cs_race", "race      : counter =  3178915  expected 4000000  lost 821085  (11 ms)", "", "# every run gives a different wrong answer: that is a race condition"],
+  deepTitle:"The critical-section problem",
+  deep:`<div class="dgrid"><div>
+<h3>What a critical section is</h3>
+<p>A <b>critical section</b> is code that touches shared data, here the three instructions of <code>counter++</code>. A <b>race condition</b> is when the result depends on the exact order in which threads are interleaved. The bug only appears for some interleavings, which is why it is so hard to catch by testing.</p>
+<pre class="pseudo">do {
+    <span class="c">entry section</span>       <span class="c">// ask permission</span>
+        critical section
+    <span class="c">exit section</span>        <span class="c">// give it back</span>
+        remainder section
+} while (true);</pre>
+</div><div>
+<h3>Three requirements for any solution</h3>
+<ul>
+<li><b>Mutual exclusion:</b> at most one thread is in its critical section at a time.</li>
+<li><b>Progress:</b> if nobody is inside and some threads want in, one of them must get in. The decision cannot be postponed forever, and threads in their remainder section cannot block it.</li>
+<li><b>Bounded waiting:</b> after a thread asks, there is a limit on how many times others can go in ahead of it, so nobody starves.</li>
+</ul>
+<h3>Why not just disable interrupts?</h3>
+<p>On a single CPU, turning interrupts off stops the scheduler from switching threads. On a multicore machine, the other core keeps running anyway, and user programs are not allowed to do it. Hence the next tabs: a software algorithm, hardware atomic instructions, and OS locks built on top of them.</p>
+</div></div>`},
+
+{ id:"peterson", label:"Software: Peterson", file:"cs_peterson.c", guarded:true, names:["T0","T1"],
+  code:`/* thread i (other is j = 1 - i), runs twice */
+flag[i] = true;                  /* I want in    */
+turn = j;                        /* you go first */
+while (flag[j] && turn == j) ;   /* spin         */
+    r = counter;                 /* critical section */
+    r = r + 1;
+    counter = r;
+flag[i] = false;                 /* exit */`,
+  vars:["counter","flag[0]","flag[1]","turn"], init:()=>({counter:0, flag:[false,false], turn:0}),
+  prog:()=>[
+    {ln:2, run:(S,T,me,D) => { S.flag[me] = true; go(T,1); return D.names[me]+" sets <code>flag["+me+"] = true</code>: \"I want to enter\"."; }},
+    {ln:3, run:(S,T,me,D) => { S.turn = 1-me; go(T,2); return D.names[me]+" sets <code>turn = "+(1-me)+"</code>: \"but you can go first\". Whoever writes <code>turn</code> <b>last</b> is the one who waits."; }},
+    {ln:4, run:(S,T,me,D) => { const j = 1-me; if (S.flag[j] && S.turn === j){ T.spins++; T.spinning = true; return D.names[me]+" tests <code>flag["+j+"] && turn == "+j+"</code>, which is <b>true</b>, so it <b>spins</b> (busy-waits). Spins so far: "+T.spins+"."; } T.spinning = false; go(T,3); return D.names[me]+" tests <code>flag["+j+"] && turn == "+j+"</code>, which is <b>false</b> ("+(S.flag[j] ? "turn is "+S.turn : "flag["+j+"] is false")+"), so it <b>enters</b> the critical section."; }},
+    ...body(5, T => go(T,6)),
+    {ln:8, run:(S,T,me,D) => { S.flag[me] = false; endRound(T,0); return D.names[me]+" sets <code>flag["+me+"] = false</code> and leaves. If the other thread is spinning, its test now fails."; }}
+  ],
+  tour:[0,1,1,0,0,1,1,0,1,1,0,1,0,1,1,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0],
+  notes:{0:"Peterson's algorithm (1981) needs only ordinary reads and writes plus two shared variables: <code>flag[2]</code> (\"I want in\") and <code>turn</code> (\"who must wait if we both want in\"). It works for exactly two threads.",
+         4:"Both flags are true and T0 wrote <code>turn = 1</code> last, so T0 politely yields. That is the tie-breaker.",
+         6:"T1's test is false because <code>turn == 1</code>, not 0. T1 goes in while T0 keeps spinning: <b>mutual exclusion</b>.",
+         32:"The counter is <b>4</b>, correct. But on the real VM the textbook version, with plain variables, lost 12–39 updates per run. Modern CPUs reorder a store with a later load, so both threads can read the other's flag as false. The fix is atomic operations with memory fences. See the real run."},
+  props:[["Mutual exclusion","yes","Only if memory is sequentially consistent (fences needed on real CPUs)"],["Progress","yes","A thread in its remainder section has flag = false and blocks no one"],["Bounded waiting","yes","After you set turn = j, the other thread can enter at most once before you"],["While waiting","mid","Spins (busy waiting), and it only works for 2 threads"]],
+  real:[PS+"./cs_peterson plain", "peterson-p: counter =  3999968  expected 4000000  lost 32  (941 ms)", PS+"./cs_peterson plain", "peterson-p: counter =  3999961  expected 4000000  lost 39  (1216 ms)", PS+"./cs_peterson plain", "peterson-p: counter =  3999988  expected 4000000  lost 12  (1254 ms)", PS+"./cs_peterson", "peterson  : counter =  4000000  expected 4000000  lost 0  (1330 ms)", "", "# plain = textbook code: x86 store-load reordering breaks it", "# default = C11 seq_cst atomics (mfence): correct"],
+  deepTitle:"Peterson's solution, and why it fails on real hardware",
+  deep:`<div class="dgrid"><div>
+<h3>Why it works on paper</h3>
+<ul>
+<li><b>Mutual exclusion:</b> to have both inside, both tests must be false. Both flags are true, so the test fails only through <code>turn</code>. But <code>turn</code> holds one value, 0 or 1, so one of the two must still be spinning.</li>
+<li><b>Progress:</b> if the other thread does not want in, its flag is false and you walk straight in.</li>
+<li><b>Bounded waiting:</b> setting <code>turn = j</code> lets the other thread go once at most. Its next entry sets <code>turn</code> back to you.</li>
+</ul>
+<h3>Earlier attempts that fail</h3>
+<p><b>Only <code>turn</code></b> (strict alternation) gives mutual exclusion but no progress: T0 cannot enter twice in a row even if T1 never wants to. <b>Only flags</b> can deadlock: both set their flag and then both wait for each other forever. Peterson combines the two.</p>
+</div><div>
+<h3>Why the textbook code breaks on this VM</h3>
+<p>An x86 CPU has a <b>store buffer</b>. <code>flag[i] = true</code> may still be sitting in the buffer when the next line reads <code>flag[j]</code> from memory. Both threads then read the old <code>false</code> and walk in together. The real run lost 12–39 updates out of 4 million per run. Compilers may also reorder or cache plain variables.</p>
+<pre class="pseudo"><span class="c">// correct version used by ./cs_peterson</span>
+atomic_store(&amp;flag[i], 1);   <span class="c">// seq_cst: full fence</span>
+atomic_store(&amp;turn, j);
+while (atomic_load(&amp;flag[j]) &amp;&amp;
+       atomic_load(&amp;turn) == j) ;</pre>
+<p>The lesson: <b>software-only algorithms assume memory behaves sequentially</b>. Real systems use hardware atomic instructions instead, as the next two tabs show.</p>
+</div></div>`},
+
+{ id:"tas", label:"Hardware: TestAndSet", file:"cs_tas.c", guarded:true, names:["T0","T1"],
+  code:`boolean TestAndSet(boolean *target) {
+    boolean rv = *target;  *target = true;
+    return rv;                    /* one atomic step */
+}
+while (TestAndSet(&lock)) ;       /* spin */
+    r = counter;                  /* critical section */
+    r = r + 1;
+    counter = r;
+lock = false;`,
+  vars:["counter","lock"], init:()=>({counter:0, lock:false}),
+  prog:()=>[
+    {ln:5, also:[2,3], run:(S,T,me,D) => { const rv = S.lock; S.lock = true; T.rv = rv; if (rv){ T.spins++; T.spinning = true; return D.names[me]+" runs <code>TestAndSet(&amp;lock)</code> <b>atomically</b>: it reads the old value <b>true</b> and writes true again. It returns true, so <b>spin</b>. Spins so far: "+T.spins+"."; } T.spinning = false; go(T,1); return D.names[me]+" runs <code>TestAndSet(&amp;lock)</code> <b>atomically</b>: it reads the old value <b>false</b> and sets <code>lock = true</code> in the same instant. It returns false, so it <b>enters</b>."; }},
+    ...body(6, T => go(T,4)),
+    {ln:9, run:(S,T,me,D) => { S.lock = false; endRound(T,0); return D.names[me]+" sets <code>lock = false</code>, an ordinary store. The next TestAndSet by anyone will succeed."; }}
+  ],
+  tour:[0,1,0,1,0,0,1,0,1,0,1,1,1,0,1,0,0,0,0,0,1,1,1,1,1],
+  notes:{0:"One shared <code>lock</code>, initially false. <code>TestAndSet</code> reads the old value <b>and</b> writes true as <b>one indivisible hardware instruction</b>. No other core can touch <code>lock</code> between the read and the write.",
+         1:"T0 saw false and set it to true in one step. If reading and writing were separate, T1 could read false in between, and both would enter. Atomicity is what prevents that.",
+         2:"T1's TestAndSet returns true (T0 holds the lock), so T1 spins on the same instruction, again and again.",
+         25:"The counter is <b>4</b>. On the VM, gcc compiled <code>__atomic_test_and_set</code> into the single x86 instruction <code>xchg %al, lock</code>, and the 2 threads spun 3.2 million times in 0.41 s."},
+  props:[["Mutual exclusion","yes","The read-and-set is one atomic instruction"],["Progress","yes","When the lock is free, the next TestAndSet succeeds"],["Bounded waiting","no","An unlucky thread can lose the race every time (starvation)"],["While waiting","mid","Spins and burns a CPU core (a spinlock)"]],
+  real:[PS+"./cs_tas", "testandset: counter =  4000000  expected 4000000  lost 0  (412 ms, 3209122 spins)", PS+"objdump -d cs_tas | grep lock", "    12ea:	xchg   %al,0x2d40(%rip)    # 4030 &lt;lock&gt;   <- TestAndSet", "    1306:	movb   $0x0,0x2d23(%rip)   # 4030 &lt;lock&gt;   <- lock = false", "", "# on x86, xchg with memory is atomic (implicitly locked)"],
+  deepTitle:"TestAndSet: the hardware does the read and write together",
+  deep:`<div class="dgrid"><div>
+<h3>How the CPU makes it atomic</h3>
+<p>The core takes exclusive ownership of the cache line holding <code>lock</code> (the cache-coherence protocol, MESI). It reads, writes and only then releases the line. Other cores trying the same instruction must wait for the line, so their operations are <b>serialised</b>. x86 uses <code>XCHG</code> or <code>LOCK BTS</code>. ARM uses load-exclusive and store-exclusive pairs (<code>LDXR</code>/<code>STXR</code>) or <code>SWP</code>. In C: <code>__atomic_test_and_set</code> or C11 <code>atomic_flag_test_and_set</code>.</p>
+<h3>Bounded waiting with TestAndSet</h3>
+<p>The plain spinlock can starve a thread. The textbook fix keeps a <code>waiting[n]</code> array. On exit, a thread scans forward for the next waiting thread and hands the lock directly to it, so each thread waits at most n − 1 turns.</p>
+</div><div>
+<h3>Spinning: good and bad</h3>
+<ul>
+<li><b>Good</b> when the critical section is tiny and each thread has its own core. There are no system calls and no context switches, which is why it was the fastest on the VM.</li>
+<li><b>Bad</b> when the holder is descheduled. Waiters burn their whole time slice doing nothing useful. On a single CPU it is pure waste, because the holder cannot run while you spin.</li>
+<li>Real spinlocks spin on a plain read first (<b>test-and-test-and-set</b>) to avoid hammering the cache line, and add a <code>pause</code> instruction or back-off.</li>
+</ul>
+<pre class="pseudo">while (true) {
+    while (lock) ;                 <span class="c">// read-only spin</span>
+    if (!TestAndSet(&amp;lock)) break; <span class="c">// then try</span>
+}</pre>
+</div></div>`},
+
+{ id:"swap", label:"Hardware: Swap", file:"cs_swap.c", guarded:true, names:["T0","T1"],
+  code:`void Swap(boolean *a, boolean *b) {
+    boolean t = *a;  *a = *b;  *b = t;   /* atomic */
+}
+key = true;
+while (key == true) Swap(&lock, &key);
+    r = counter;
+    r = r + 1;
+    counter = r;
+lock = false;`,
+  vars:["counter","lock"], init:()=>({counter:0, lock:false}),
+  prog:()=>[
+    {ln:4, run:(S,T,me,D) => { T.key = true; go(T,1); return D.names[me]+" sets its <b>own local</b> <code>key = true</code>. Each thread has a private key."; }},
+    {ln:5, also:[2], run:(S,T,me,D) => { const t = S.lock; S.lock = T.key; T.key = t; if (T.key){ T.spins++; T.spinning = true; return D.names[me]+" runs <code>Swap(&amp;lock, &amp;key)</code> <b>atomically</b>: lock was true, so it gets true back and its key stays true. It <b>spins</b>. Spins so far: "+T.spins+"."; } T.spinning = false; go(T,2); return D.names[me]+" runs <code>Swap(&amp;lock, &amp;key)</code> <b>atomically</b>: <code>lock</code> becomes true and its key becomes <b>false</b>. The loop ends and it <b>enters</b>."; }},
+    ...body(6, T => go(T,5)),
+    {ln:9, run:(S,T,me,D) => { S.lock = false; T.key = null; endRound(T,0); return D.names[me]+" sets <code>lock = false</code>. The next Swap by a waiting thread will pull out that false."; }}
+  ],
+  tour:[0,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1],
+  notes:{0:"Swap exchanges two words in one atomic step. Each thread puts <code>true</code> in its private <code>key</code> and keeps swapping it with <code>lock</code> until it gets <code>false</code> back. Exactly one thread can pull out the single false.",
+         3:"T0 pulled out the false and left true in <code>lock</code>. There is only one false in the system, and T0's key now holds it.",
+         4:"T1 swaps true for true: nothing changes, and it keeps spinning.",
+         27:"The counter is <b>4</b>. On the VM, <code>__atomic_exchange_n</code> compiled to <code>xchg %eax, lock</code>. TestAndSet and Swap are really the same hardware instruction: TestAndSet is a Swap that always writes true."},
+  props:[["Mutual exclusion","yes","Only one thread can hold the single false"],["Progress","yes","A free lock is grabbed by the next Swap"],["Bounded waiting","no","Same starvation risk as TestAndSet"],["While waiting","mid","Spins (a spinlock)"]],
+  real:[PS+"./cs_swap", "swap      : counter =  4000000  expected 4000000  lost 0  (471 ms, 4105787 spins)", PS+"objdump -d cs_swap | grep lock", "    12e5:	xchg   %eax,0x2d45(%rip)   # 4030 &lt;lock&gt;   <- Swap(&amp;lock, &amp;key)", "    130b:	movl   $0x0,0x2d1b(%rip)   # 4030 &lt;lock&gt;   <- lock = false"],
+  deepTitle:"Swap, and the wider family of atomic instructions",
+  deep:`<div class="dgrid"><div>
+<h3>Swap vs TestAndSet</h3>
+<p>Think of the value <b>false</b> as a single physical token. Swap trades your token for whatever is in <code>lock</code>. Whoever ends up holding the false token is inside. When it leaves, it puts the false back. TestAndSet is a special case: it always swaps in <code>true</code> and hands you the old value.</p>
+<h3>Compare-and-swap (CAS)</h3>
+<p>Modern code mostly uses <b>CAS</b>: \"if <code>*p == expected</code>, write <code>new</code>; tell me whether it worked\". It is x86 <code>LOCK CMPXCHG</code>, or C11 <code>atomic_compare_exchange_strong</code>. CAS can build any lock-free structure, such as counters, stacks and queues.</p>
+<pre class="pseudo">bool CAS(int *p, int expected, int new) {   <span class="c">// atomic</span>
+    if (*p != expected) return false;
+    *p = new; return true;
+}
+while (!CAS(&amp;lock, 0, 1)) ;   <span class="c">// spinlock</span></pre>
+</div><div>
+<h3>Even simpler: one atomic add</h3>
+<p>For a plain counter you do not need a lock at all. <code>__atomic_fetch_add(&amp;counter, 1, __ATOMIC_RELAXED)</code> compiles to <code>LOCK XADD</code>, which makes the whole load–add–store a single atomic instruction. Locks are needed when the critical section touches <b>several</b> values that must change together.</p>
+<h3>Common to both tabs</h3>
+<ul><li>They give mutual exclusion and progress, but not bounded waiting.</li><li>Waiters spin. That is fine for tiny critical sections, wasteful otherwise.</li><li>They are the building blocks the OS uses to build <b>sleeping</b> locks, the mutex and the semaphore in the next tabs.</li></ul>
+</div></div>`},
+
+{ id:"mutex", label:"Mutex", file:"cs_mutex.c", guarded:true, names:["T0","T1"], kind:"mutex",
+  code:`pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_lock(&m);      /* owner? else sleep */
+    r = counter;             /* critical section */
+    r = r + 1;
+    counter = r;
+pthread_mutex_unlock(&m);    /* wake one sleeper */`,
+  vars:["counter","m.owner","m.queue"], init:()=>({counter:0, owner:null, queue:[]}),
+  prog:()=>[
+    {ln:2, run:(S,T,me,D) => { if (S.owner === null){ S.owner = me; go(T,1); return D.names[me]+" calls <code>pthread_mutex_lock</code>. The mutex is free, so "+D.names[me]+" becomes its <b>owner</b> and goes in. This is the fast path: one atomic instruction and no system call."; } T.st = "sleep"; S.queue.push(me); return D.names[me]+" calls <code>pthread_mutex_lock</code>, but "+D.names[S.owner]+" owns it. Instead of spinning, "+D.names[me]+" makes a <code>futex</code> system call and the kernel puts it to <b>sleep</b>. It uses no CPU until it is woken."; }},
+    ...body(3, T => go(T,4)),
+    {ln:6, run:(S,T,me,D,Th) => { S.owner = null; let msg = D.names[me]+" calls <code>pthread_mutex_unlock</code> and gives up ownership."; if (S.queue.length){ const w = S.queue.shift(); S.owner = w; Th[w].st = "ready"; Th[w].pc = 1; msg += " "+D.names[w]+" was sleeping, so the kernel <b>wakes it</b> and it now owns the mutex."; } endRound(T,0); return msg; }}
+  ],
+  tour:[0,1,0,0,0,0,0,1,1,1,1,1,0,0,0,0,1,1,1,1],
+  notes:{0:"A <b>mutex</b> (mutual-exclusion lock) has two operations, <code>lock</code> and <code>unlock</code>, and an <b>owner</b>. The big difference from TestAndSet: a waiting thread <b>sleeps</b> instead of spinning.",
+         2:"T1 is now <b>asleep</b>. In free mode you cannot even pick it: a sleeping thread is not runnable. Compare that with the spinning in the TestAndSet tab.",
+         6:"The unlock handed the mutex straight to the sleeper. T1 wakes up already owning it.",
+         20:"The counter is <b>4</b>. On the VM, <code>cs_mutex</code> took 0.56 s: a little slower than the spinlock for this tiny critical section, but no CPU was wasted while waiting."},
+  props:[["Mutual exclusion","yes","Only the owner is inside"],["Progress","yes","Unlock wakes a waiter"],["Bounded waiting","mid","glibc is not strictly FIFO, so a running thread can barge in first"],["While waiting","yes","Sleeps in the kernel (futex), using no CPU"]],
+  real:[PS+"./cs_mutex", "mutex     : counter =  4000000  expected 4000000  lost 0  (560 ms)", "", "# uncontended lock/unlock = one atomic instruction, no syscall", "# contended = futex(FUTEX_WAIT) puts the thread to sleep"],
+  deepTitle:"Mutex locks in depth",
+  deep:`<div class="dgrid"><div>
+<h3>What a mutex is</h3>
+<p>A mutex is a lock with an <b>owner</b>. <code>lock()</code> either takes it or blocks. <code>unlock()</code> releases it and may wake one waiter. <b>Only the thread that locked it may unlock it</b>. That rule makes mistakes detectable and enables features like priority inheritance.</p>
+<pre class="pseudo">pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_lock(&amp;m);
+    <span class="c">/* critical section */</span>
+pthread_mutex_unlock(&amp;m);
+
+pthread_mutex_trylock(&amp;m);   <span class="c">// EBUSY instead of blocking</span></pre>
+<h3>How Linux implements it: the futex</h3>
+<p>The mutex is an integer in user memory. <b>Fast path:</b> one atomic compare-and-swap from 0 to 1 takes it, with no kernel involvement. <b>Slow path:</b> if it is taken, the thread calls <code>futex(FUTEX_WAIT)</code> and the kernel puts it to sleep on a queue keyed by that address. Unlock does an atomic store and, if someone is waiting, calls <code>futex(FUTEX_WAKE)</code>. So an uncontended mutex costs about as much as a TestAndSet.</p>
+</div><div>
+<h3>Mutex vs spinlock</h3>
+<ul>
+<li><b>Spinlock:</b> waits by looping. Best for very short sections on multicore, and used inside the kernel where sleeping is not allowed (interrupt handlers).</li>
+<li><b>Mutex:</b> waits by sleeping. Best when sections are long or threads outnumber cores. Many mutexes spin briefly before sleeping (adaptive).</li>
+</ul>
+<h3>Mutex vs binary semaphore</h3>
+<p>They look alike, since both start \"free\" and allow one thread in. But a mutex has an <b>owner</b> and a semaphore does not: <b>any</b> thread may <code>signal</code> a semaphore. That is why semaphores can do ordering (next tabs), and why mutexes can offer recursive locking, error checking and priority inheritance.</p>
+<h3>Pitfalls</h3>
+<ul>
+<li>Forgetting to unlock on an error path, so everyone else sleeps forever.</li>
+<li><b>Deadlock:</b> T0 holds A and wants B, while T1 holds B and wants A. Always lock in one global order.</li>
+<li><b>Priority inversion:</b> a low-priority owner blocks a high-priority waiter. Fix it with <code>PTHREAD_PRIO_INHERIT</code>.</li>
+</ul>
+</div></div>`},
+
+{ id:"binsem", label:"Binary semaphore (key)", file:"cs_binsem.c", guarded:true, names:["T0","T1"], kind:"sem",
+  code:`semaphore mutex = 1;          /* one key on the desk */
+wait(mutex);                  /* take the key, or sleep */
+    r = counter;              /* critical section */
+    r = r + 1;
+    counter = r;
+signal(mutex);                /* return the key, or hand it over */`,
+  vars:["counter","mutex","queue"], init:()=>({counter:0, value:1, queue:[], holder:null}),
+  prog:()=>[
+    {ln:2, run:(S,T,me,D) => { if (S.value > 0){ S.value--; S.holder = me; go(T,1); return D.names[me]+" calls <code>wait(mutex)</code>. The value is 1 (the key is on the desk), so it becomes <b>0</b> and "+D.names[me]+" takes the key and goes in."; } T.st = "sleep"; S.queue.push(me); return D.names[me]+" calls <code>wait(mutex)</code>, but the value is 0: no key on the desk. "+D.names[me]+" <b>sleeps</b> in the semaphore's queue."; }},
+    ...body(3, T => go(T,4)),
+    {ln:6, run:(S,T,me,D,Th) => { let msg; if (S.queue.length){ const w = S.queue.shift(); S.holder = w; Th[w].st = "ready"; Th[w].pc = 1; msg = D.names[me]+" calls <code>signal(mutex)</code>. Someone is waiting, so the key goes <b>straight to "+D.names[w]+"</b>, which wakes up holding it. The value stays 0."; } else { S.value++; S.holder = null; msg = D.names[me]+" calls <code>signal(mutex)</code> and nobody is waiting, so the key goes back on the desk: value <b>1</b>."; } endRound(T,0); return msg; }}
+  ],
+  tour:[0,1,0,0,0,0,0,1,1,1,1,1,0,0,0,0,1,1,1,1],
+  notes:{0:"A <b>binary semaphore</b> only takes the values <b>0</b> and <b>1</b>, like one washroom key at a hostel desk. 1 means the key is on the desk; 0 means someone has it. <code>wait</code> takes the key, and <code>signal</code> returns it.",
+         2:"T1 found the desk empty and is sleeping in the queue. Like the mutex, and unlike TestAndSet, it uses no CPU while waiting.",
+         6:"T0's signal handed the key directly to T1. T1 is now inside.",
+         20:"The counter is <b>4</b> and the key is back on the desk (value 1). The real <code>cs_binsem</code> (POSIX <code>sem_wait</code>/<code>sem_post</code>) gave exactly 4,000,000."},
+  props:[["Mutual exclusion","yes","Value 1 means at most one wait succeeds"],["Progress","yes","Signal wakes a waiter or frees the key"],["Bounded waiting","yes","With a FIFO wait queue, as modelled here"],["While waiting","yes","Sleeps (no CPU)"]],
+  real:[PS+"./cs_binsem", "binsem    : counter =  4000000  expected 4000000  lost 0  (1270 ms)", "", "# sem_init(&mutex, 0, 1);   sem_wait = wait,  sem_post = signal"],
+  deepTitle:"Binary semaphores: 0 or 1, like a key to one room",
+  deep:`<div class="dgrid"><div>
+<h3>Two ways to use a binary semaphore</h3>
+<ul>
+<li><b>Start at 1, mutual exclusion:</b> <code>wait(mutex); critical section; signal(mutex);</code> It behaves like a mutex lock. This is the tab you are on.</li>
+<li><b>Start at 0, ordering:</b> make one event wait for another. P2 does <code>wait(synch)</code> before S2 and P1 does <code>signal(synch)</code> after S1, so S2 always runs after S1. See the next tab.</li>
+</ul>
+<h3>The definition</h3>
+<pre class="pseudo">wait(S):   if (S == 1) S = 0;
+           else sleep in S.queue;
+signal(S): if (S.queue not empty) wake one;
+           else S = 1;</pre>
+</div><div>
+<h3>A counting semaphore from binary ones</h3>
+<p>A counting semaphore C (value N) can be built from two binary semaphores and an integer: <code>S1 = 1</code> protects the integer, and <code>S2 = 0</code> is where waiters sleep.</p>
+<pre class="pseudo">int C = N;  binary S1 = 1, S2 = 0;
+
+wait(C):   wait(S1);
+           C--;
+           if (C &lt; 0) { signal(S1); wait(S2); }
+           signal(S1);
+
+signal(C): wait(S1);
+           C++;
+           if (C &lt;= 0) signal(S2);   <span class="c">// pass S1 to the woken one</span>
+           else signal(S1);</pre>
+<p>Here a negative <code>C</code> counts the sleepers. The woken thread inherits <code>S1</code> and releases it, so no other thread slips in between.</p>
+</div></div>`},
+
+{ id:"order", label:"Ordering: synch = 0", file:"sem_order.c", guarded:false, names:["P1","P2"], kind:"order",
+  code:`semaphore synch = 0;     /* S1 has not happened yet */
+/* P1 */
+S1;                      /* write the result */
+signal(synch);
+/* P2 */
+wait(synch);
+S2;                      /* read the result  */`,
+  vars:["synch","queue","result"], init:()=>({value:0, queue:[], result:null, s1:false, s2:false, bad:false}),
+  progs:()=>[
+    [ {ln:3, run:(S,T,me,D) => { S.result = 42; S.s1 = true; go(T,1); return "P1 runs <b>S1</b> and writes the result (42)."; }},
+      {ln:4, run:(S,T,me,D,Th) => { if (S.queue.length){ const w = S.queue.shift(); Th[w].st = "ready"; Th[w].pc = 1; go(T,99); return "P1 calls <code>signal(synch)</code>. P2 is sleeping, so the kernel <b>wakes P2</b>. The value stays 0."; } S.value++; go(T,99); return "P1 calls <code>signal(synch)</code>. Nobody is waiting yet, so the value becomes <b>1</b>: \"S1 is done\" is remembered for later."; }} ],
+    [ {ln:6, run:(S,T,me,D) => { if (S.value > 0){ S.value--; go(T,1); return "P2 calls <code>wait(synch)</code>. The value is 1, so S1 already happened. It drops to 0 and P2 continues <b>without sleeping</b>."; } T.st = "sleep"; S.queue.push(me); return "P2 calls <code>wait(synch)</code>. The value is 0, so S1 has not happened yet and P2 <b>sleeps</b>."; }},
+      {ln:7, run:(S,T,me,D) => { S.s2 = true; if (!S.s1) S.bad = true; go(T,99); return "P2 runs <b>S2</b> and reads result = <b>"+S.result+"</b>. Correct: S1 ran first."; }} ]
+  ],
+  tour:[1,0,0,1],
+  notes:{0:"Now the semaphore starts at <b>0</b> and is used for <b>ordering</b>, not mutual exclusion. Rule: <b>S2 in P2 must run after S1 in P1</b>, whatever the scheduler does. On the real VM, P2 was even started first, on purpose.",
+         1:"P2 got to <code>wait(synch)</code> first and fell asleep. Without the semaphore it would have read the result before it existed.",
+         4:"Done in the right order. Try <b>You are the scheduler</b>: run P1 first instead. The signal leaves the value at 1, and P2's wait then passes straight through. Every order you can pick ends with S1 before S2."},
+  props:[["Guarantee","yes","S2 never runs before S1, in any interleaving"],["If P2 arrives first","yes","It sleeps until P1 signals"],["If P1 signals first","yes","The value 1 remembers the signal, so P2 does not block"],["Why not a mutex?","mid","A mutex must be unlocked by its owner; here P1 signals and P2 waits"]],
+  real:[PS+"./sem_order", "[    1 ms] P2: wait(synch), S1 not done yet", "[ 2023 ms] P1: S1  (write the result)", "[ 2026 ms] P2: S2  (read the result)", "", "# P2 was started first and slept ~2 s until P1 signalled"],
+  deepTitle:"Ordering with synch = 0",
+  deep:`<div class="dgrid"><div>
+<h3>The pattern</h3>
+<pre class="pseudo">semaphore synch = 0;
+
+P1:  S1;              P2:  wait(synch);
+     signal(synch);        S2;</pre>
+<p>A semaphore <b>remembers</b> signals. If P1 signals before P2 waits, the value 1 stores that event and P2 passes straight through. If P2 waits first, it sleeps until the signal. Either way S1 happens before S2. A simple flag variable cannot do this safely without busy waiting.</p>
+<h3>Where you meet it</h3>
+<ul><li>A thread must not read a buffer until a producer has filled it.</li><li>The main thread waits for worker initialisation to finish.</li><li>The <i>Semaphore: fix the race</i> tab in the IPC simulator uses exactly this, with <code>/ready = 0</code> between two processes.</li></ul>
+</div><div>
+<h3>Chaining and rendezvous</h3>
+<p>To force S1 → S2 → S3 across three processes, use two semaphores, <code>a = 0</code> and <code>b = 0</code>. P1 runs S1 then signals a; P2 waits on a, runs S2, then signals b; P3 waits on b, then runs S3. For a <b>rendezvous</b>, where each of two threads waits for the other, each one signals its own semaphore and then waits on the other's.</p>
+<h3>Why a mutex cannot do this</h3>
+<p>Ordering needs one thread to wait and a <b>different</b> thread to release it. A mutex must be unlocked by the thread that locked it, so using one this way is undefined behaviour in POSIX. A semaphore has no owner, so this is exactly what it is for.</p>
+</div></div>`}
+];
+
+/* ---------------- engine ---------------- */
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TOK = /(\/\*.*?\*\/)|\b(boolean|void|int|return|while|for|if|true|false|semaphore|pthread_mutex_t)\b|\b(TestAndSet|Swap|wait|signal|pthread_mutex_lock|pthread_mutex_unlock|PTHREAD_MUTEX_INITIALIZER)\b/g;
+function hl(line){ let o = "", last = 0, m; TOK.lastIndex = 0; while ((m = TOK.exec(line))){ o += esc(line.slice(last, m.index)); o += '<span class="'+(m[1]?"c":m[2]?"k":"f")+'">'+esc(m[0])+"</span>"; last = TOK.lastIndex; } return o + esc(line.slice(last)); }
+
+let demo = 0, mode = "tour", tstep = 0, hist = [], timer = null;
+const progsOf = D => D.progs ? D.progs() : [D.prog(), D.prog()];
+
+function replay(D, h){
+  const S = D.init(), P = progsOf(D);
+  const Th = [0,1].map(() => ({pc:0, k:0, r:null, rv:null, key:null, spins:0, st:"ready", loaded:false, spinning:false}));
+  let last = null, prevS = JSON.stringify(S);
+  h.forEach(me => {
+    const T = Th[me], ins = P[me][T.pc];
+    if (!ins || T.st === "sleep") return;
+    const before = JSON.parse(JSON.stringify(S));
+    const msg = ins.run(S, T, me, D, Th);
+    const changed = Object.keys(S).filter(k => JSON.stringify(S[k]) !== JSON.stringify(before[k]));
+    last = {me, ln:[ins.ln].concat(ins.also||[]), msg, changed};
+  });
+  return {S, Th, P, last};
+}
+const runnable = (st, i) => st.Th[i].st !== "sleep" && st.P[i][st.Th[i].pc] !== undefined;
+const inside = (D, st, i) => { const T = st.Th[i]; if (!st.P[i][T.pc]) return false; return D.guarded ? !!st.P[i][T.pc].cs : T.loaded; };
+
+function renderTabs(){
+  $("tabs").innerHTML = DEMOS.map((d,i) => '<button role="tab" type="button" aria-selected="'+(i===demo)+'" data-i="'+i+'"><span class="n">'+(i+1)+'</span>'+esc(d.label)+'</button>').join("");
+  $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => select(+b.dataset.i));
+}
+function select(i){
+  stop(); demo = i; tstep = 0; hist = [];
+  renderTabs(); buildStatic(); render();
+  try{ history.replaceState(null, "", "#"+DEMOS[i].id); }catch(e){}
+}
+
+function buildStatic(){
+  const D = DEMOS[demo];
+  $("code").innerHTML = D.code.split("\n").map((l,i) => '<div class="ln" data-n="'+(i+1)+'"><span class="no">'+(i+1)+'</span><span class="mk"></span><span class="src">'+hl(l)+'</span></div>').join("");
+  $("srclink").href = REPO + D.file; $("srclink").textContent = "Real C version: " + D.file;
+  $("lg0").textContent = D.names[0]; $("lg1").textContent = D.names[1];
+  $("run0").textContent = "Run " + D.names[0] + " ▶"; $("run1").textContent = "Run " + D.names[1] + " ▶";
+  $("real").innerHTML = D.real.map(l => l.startsWith(PS) ? '<span class="pr">cosmos@vm</span>:<span class="pa">~/critical-section</span>$ ' + esc(l.slice(PS.length)) : l.startsWith("#") ? '<span class="dim">'+l+'</span>' : /lost [1-9]/.test(l) ? '<span class="bad">'+l+'</span>' : /lost 0/.test(l) ? '<span class="good">'+l+'</span>' : l).join("\n");
+  const cls = {yes:"yes", no:"no", mid:"mid", "—":""};
+  const txt = {yes:"Yes", no:"No", mid:"Partly", "—":"—"};
+  $("props").innerHTML = "<table>" + D.props.map(([k,v,n]) => '<tr><td>'+esc(k)+'</td><td><span class="'+cls[v]+'">'+txt[v]+'</span>'+(n ? '<br><span class="hint">'+esc(n)+'</span>' : "")+'</td></tr>').join("") + "</table>";
+  $("deepTitle").textContent = D.deepTitle; $("deep").innerHTML = D.deep;
+}
+
+function statusOf(D, st, i){
+  const T = st.Th[i];
+  if (!st.P[i][T.pc]) return ["done","var(--dead)"];
+  if (T.st === "sleep") return ["sleeping","var(--warn)"];
+  if (T.spinning) return ["spinning","var(--bad)"];
+  if (inside(D, st, i)) return ["in critical section","var(--ok)"];
+  return ["ready","var(--muted)"];
+}
+
+function diagram(D, st){
+  const W = 700, H = 330, cols = ["var(--t0)","var(--t1)"], bgs = ["var(--t0-bg)","var(--t1-bg)"];
+  let g = '<svg class="dia" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Thread states and shared variables">';
+  [0,1].forEach(i => {
+    const x = i ? 440 : 16, T = st.Th[i], [lab, col] = statusOf(D, st, i), act = st.last && st.last.me === i;
+    g += '<rect x="'+x+'" y="12" width="244" height="124" rx="10" fill="'+bgs[i]+'" stroke="'+cols[i]+'" stroke-width="'+(act?3:1.4)+'"/>';
+    g += '<text x="'+(x+12)+'" y="36" font-size="17" font-weight="700" font-family="var(--mono)" fill="'+cols[i]+'">'+D.names[i]+'</text>';
+    g += '<rect x="'+(x+110)+'" y="22" width="124" height="20" rx="10" fill="var(--panel)" stroke="'+col+'"/><text x="'+(x+172)+'" y="36" font-size="11" font-weight="600" text-anchor="middle" fill="'+col+'">'+lab+'</text>';
+    const rows = [];
+    if (D.kind !== "order"){ rows.push("register r = " + (T.r === null ? "–" : T.r)); rows.push("rounds done: " + T.k + " / " + ITER); }
+    if (D.id === "tas") rows.push("rv (last TestAndSet) = " + (T.rv === null ? "–" : B(T.rv)));
+    if (D.id === "swap") rows.push("local key = " + (T.key === null ? "–" : B(T.key)));
+    if (D.id === "peterson" || D.id === "tas" || D.id === "swap") rows.push("spins: " + T.spins);
+    if (D.kind === "order") rows.push(i === 0 ? "job: S1, then signal" : "job: wait, then S2");
+    rows.forEach((r,k) => g += '<text x="'+(x+12)+'" y="'+(62+k*17)+'" font-size="12" font-family="var(--mono)" fill="var(--ink)">'+esc(r)+'</text>');
+  });
+  if (D.kind === "order"){
+    g += '<rect x="230" y="150" width="240" height="56" rx="10" fill="var(--panel)" stroke="var(--line)"/>';
+    g += '<text x="350" y="170" font-size="12" font-weight="650" text-anchor="middle" fill="var(--ink)">order check</text>';
+    g += '<text x="350" y="192" font-size="12" text-anchor="middle" font-family="var(--mono)" fill="var(--ink)">S1 '+(st.S.s1?"✔":"…")+'   →   S2 '+(st.S.s2?"✔":"…")+'</text>';
+  } else {
+    const ins = [0,1].filter(i => inside(D, st, i)), both = ins.length === 2;
+    g += '<rect x="210" y="146" width="280" height="62" rx="10" fill="'+(both ? "var(--bad-bg)" : "var(--panel)")+'" stroke="'+(both ? "var(--bad)" : "var(--ok)")+'" stroke-width="'+(both?2.5:1.4)+'"/>';
+    g += '<text x="222" y="165" font-size="12" font-weight="650" fill="'+(both?"var(--bad)":"var(--ink)")+'">critical section'+(both?": TWO threads inside!":"")+'</text>';
+    if (!ins.length) g += '<text x="222" y="192" font-size="12" fill="var(--muted)">(empty)</text>';
+    ins.forEach((i,k) => g += '<rect x="'+(222+k*70)+'" y="176" width="62" height="24" rx="12" fill="'+bgs[i]+'" stroke="'+cols[i]+'"/><text x="'+(253+k*70)+'" y="192" font-size="12" font-weight="600" font-family="var(--mono)" text-anchor="middle" fill="'+cols[i]+'">'+D.names[i]+'</text>');
+  }
+  g += '<rect x="0" y="222" width="'+W+'" height="'+(H-222)+'" fill="var(--kernel)"/>';
+  g += '<text x="10" y="240" font-size="11" fill="var(--muted)">shared memory (seen by both threads)</text>';
+  const S = st.S, ch = st.last ? st.last.changed : [];
+  const cells = [];
+  if ("counter" in S) cells.push(["counter", S.counter, ch.includes("counter")]);
+  if (D.id === "peterson"){ cells.push(["flag[0]", B(S.flag[0]), ch.includes("flag")]); cells.push(["flag[1]", B(S.flag[1]), ch.includes("flag")]); cells.push(["turn", S.turn, ch.includes("turn")]); }
+  if (D.id === "tas" || D.id === "swap") cells.push(["lock", B(S.lock), ch.includes("lock")]);
+  if (D.kind === "mutex"){ cells.push(["m.owner", S.owner === null ? "none" : D.names[S.owner], ch.includes("owner")]); cells.push(["sleep queue", S.queue.map(q => D.names[q]).join(", ") || "empty", ch.includes("queue")]); }
+  if (D.kind === "sem"){ cells.push(["mutex (value)", S.value + (S.value ? "  🔑 on desk" : "  key taken"), ch.includes("value")]); cells.push(["sleep queue", S.queue.map(q => D.names[q]).join(", ") || "empty", ch.includes("queue")]); }
+  if (D.kind === "order"){ cells.push(["synch (value)", S.value, ch.includes("value")]); cells.push(["sleep queue", S.queue.map(q => D.names[q]).join(", ") || "empty", ch.includes("queue")]); cells.push(["result", S.result === null ? "not written" : S.result, ch.includes("result")]); }
+  const cw = (W - 20 - (cells.length-1)*10) / cells.length;
+  cells.forEach(([n,v,c],k) => {
+    const x = 10 + k*(cw+10);
+    g += '<rect x="'+x+'" y="250" width="'+cw+'" height="66" rx="9" fill="'+(c ? "var(--chg)" : "var(--panel)")+'" stroke="'+(c ? "var(--warn)" : "var(--line)")+'" stroke-width="'+(c?2:1)+'"/>';
+    g += '<text x="'+(x+cw/2)+'" y="270" font-size="11.5" text-anchor="middle" fill="var(--muted)" font-family="var(--mono)">'+esc(n)+'</text>';
+    g += '<text x="'+(x+cw/2)+'" y="299" font-size="'+(String(v).length > 10 ? 13 : 20)+'" font-weight="700" text-anchor="middle" fill="var(--ink)" font-family="var(--mono)">'+esc(v)+'</text>';
+  });
+  return g + "</svg>";
+}
+
+function render(){
+  const D = DEMOS[demo];
+  const h = mode === "tour" ? D.tour.slice(0, tstep) : hist;
+  const st = replay(D, h);
+  document.querySelectorAll(".ln").forEach(e => { e.className = "ln"; e.querySelector(".mk").innerHTML = ""; });
+  [0,1].forEach(i => {
+    const ins = st.P[i][st.Th[i].pc]; if (!ins) return;
+    const el = document.querySelector('.ln[data-n="'+ins.ln+'"]'); if (!el) return;
+    el.classList.add(el.classList.contains("r"+(1-i)) ? "r01" : "r"+i);
+    el.querySelector(".mk").insertAdjacentHTML("beforeend", '<span class="m'+i+'">'+D.names[i]+(st.Th[i].st==="sleep"?" zz":"")+'</span>');
+  });
+  if (st.last) st.last.ln.forEach(n => { const el = document.querySelector('.ln[data-n="'+n+'"]'); if (el) el.classList.add("ex"); });
+  $("dia").innerHTML = diagram(D, st);
+  const done = [0,1].every(i => !st.P[i][st.Th[i].pc]);
+  const both = D.kind !== "order" && [0,1].every(i => inside(D, st, i));
+  const bn = $("banner");
+  if (both){ bn.className = "banner bad"; bn.textContent = "Mutual exclusion violated: both threads are in the critical section."; }
+  else if (done && "counter" in st.S){ const ok = st.S.counter === ITER*2; bn.className = "banner " + (ok ? "ok" : "bad"); bn.textContent = "Finished: counter = " + st.S.counter + " (expected " + ITER*2 + ")" + (ok ? ". Correct." : ". " + (ITER*2 - st.S.counter) + " update(s) lost."); }
+  else if (done){ bn.className = "banner ok"; bn.textContent = "Finished: S1 ran before S2. The order was enforced."; }
+  else if (!runnable(st,0) && !runnable(st,1)){ bn.className = "banner bad"; bn.textContent = "Deadlock: nobody can run."; }
+  else { bn.className = "banner n"; bn.textContent = D.kind === "order" ? "Rule: S2 must not run before S1." : "Invariant to keep: at most one thread in the critical section."; }
+  const note = mode === "tour" ? D.notes[tstep] : (hist.length === 0 ? D.notes[0] : null);
+  let ex;
+  if (st.last && !(mode === "tour" && note && tstep === 0)){
+    const i = st.last.me;
+    ex = '<span class="tag t'+i+'">'+D.names[i]+' ran · step '+h.length+'</span><p>'+st.last.msg+'</p>' + (note && h.length ? '<p style="margin-top:8px">'+note+'</p>' : "");
+  } else ex = '<span class="tag n">'+esc(D.label)+'</span><p>'+(note || "")+'</p>' + (mode === "free" ? '<p class="hint" style="margin-top:8px">You are the scheduler. Press <b>Run '+D.names[0]+'</b> or <b>Run '+D.names[1]+'</b> to execute one instruction of that thread. Try to get both threads into the critical section, or to lose an update.</p>' : "");
+  $("explain").innerHTML = ex;
+  if (mode === "tour"){
+    $("count").textContent = "step " + tstep + " / " + D.tour.length;
+    $("prev").disabled = tstep === 0; $("next").disabled = tstep === D.tour.length;
+  } else {
+    $("count").textContent = h.length + " instruction" + (h.length === 1 ? "" : "s") + " run";
+    $("run0").disabled = !runnable(st,0); $("run1").disabled = !runnable(st,1);
+    $("runR").disabled = !runnable(st,0) && !runnable(st,1); $("undo").disabled = !hist.length;
+    $("run0").title = st.Th[0].st === "sleep" ? D.names[0] + " is asleep and cannot run" : ""; $("run1").title = st.Th[1].st === "sleep" ? D.names[1] + " is asleep and cannot run" : "";
+  }
+}
+
+function stop(){ clearInterval(timer); timer = null; $("play").innerHTML = "&#9654; Play"; }
+function next(){ const D = DEMOS[demo]; if (tstep < D.tour.length){ tstep++; render(); } else stop(); }
+function play(){ if (timer){ stop(); return; } if (tstep === DEMOS[demo].tour.length){ tstep = 0; render(); } $("play").innerHTML = "&#10074;&#10074; Pause"; timer = setInterval(next, +$("speed").value); }
+function setMode(m){ stop(); mode = m; $("mTour").setAttribute("aria-pressed", m === "tour"); $("mFree").setAttribute("aria-pressed", m === "free"); $("tourCtl").hidden = m !== "tour"; $("freeCtl").hidden = m !== "free"; render(); }
+function runT(i){ const st = replay(DEMOS[demo], hist); if (runnable(st,i)){ hist.push(i); render(); } }
+
+$("mTour").onclick = () => setMode("tour"); $("mFree").onclick = () => setMode("free");
+$("next").onclick = () => { stop(); next(); };
+$("prev").onclick = () => { stop(); if (tstep > 0){ tstep--; render(); } };
+$("reset").onclick = () => { stop(); tstep = 0; render(); };
+$("play").onclick = play;
+$("speed").onchange = () => { if (timer){ stop(); play(); } };
+$("run0").onclick = () => runT(0); $("run1").onclick = () => runT(1);
+$("runR").onclick = () => { const st = replay(DEMOS[demo], hist); const c = [0,1].filter(i => runnable(st,i)); if (c.length){ hist.push(c[Math.floor(Math.random()*c.length)]); render(); } };
+$("undo").onclick = () => { hist.pop(); render(); };
+$("freset").onclick = () => { hist = []; render(); };
+document.addEventListener("keydown", e => {
+  if (e.target.closest("select")) return;
+  if (mode === "tour"){
+    if (e.key === "ArrowRight"){ stop(); next(); e.preventDefault(); }
+    else if (e.key === "ArrowLeft"){ stop(); if (tstep > 0){ tstep--; render(); } e.preventDefault(); }
+    else if (e.key === " " && !e.target.closest("button")){ play(); e.preventDefault(); }
+  } else {
+    if (e.key === "0" || e.key === "1"){ runT(+e.key); }
+    else if (e.key === "Backspace"){ hist.pop(); render(); e.preventDefault(); }
+  }
+});
+$("theme").onclick = () => { const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark ? "light" : "dark"; try{ localStorage.setItem("cs-theme", r.dataset.theme); }catch(e){} };
+try{ const t = localStorage.getItem("cs-theme"); if (t) document.documentElement.dataset.theme = t; }catch(e){}
+const start = DEMOS.findIndex(d => d.id === location.hash.slice(1));
+demo = start >= 0 ? start : 0;
+renderTabs(); buildStatic(); render();
+</script>
+</body>
+</html>
