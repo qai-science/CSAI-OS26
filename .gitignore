@@ -4,3 +4,6 @@ pipes-namedpipes-sharedmemory/pipe_demo
 pipes-namedpipes-sharedmemory/fifo_writer
 pipes-namedpipes-sharedmemory/fifo_reader
 .DS_Store
+pipes-namedpipes-sharedmemory/sem_writer
+pipes-namedpipes-sharedmemory/sem_reader
+pipes-namedpipes-sharedmemory/sem_counting
