@@ -14,3 +14,7 @@ critical-section/cs_swap
 critical-section/cs_mutex
 critical-section/cs_binsem
 critical-section/sem_order
+monitors-and-algorithms/monitor_bank
+monitors-and-algorithms/alg1_turn
+monitors-and-algorithms/alg2_flag
+monitors-and-algorithms/bakery

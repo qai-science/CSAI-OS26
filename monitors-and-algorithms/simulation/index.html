@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitors and Bakery</title>
+<meta name="description" content="Step-by-step simulation of monitors, Algorithm 1, Algorithm 2, Peterson's solution and Lamport's bakery algorithm (CSAI-OS26, topics 3.11 to 3.15).">
+<style>
+:root{
+  --bg:#f6f6f4; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6b66; --line:#dcdcd6; --soft:#efefeb;
+  --accent:#1f5fa8; --accent-bg:#e7f0fa; --ok:#2f7d32; --ok-bg:#e6f3e6; --warn:#a15c00; --warn-bg:#fdf0dc;
+  --bad:#b3261e; --bad-bg:#fbe6e4; --dead:#8a8a84; --zone:#f1efe8; --chg:#fff3b8;
+  --c0:#1f5fa8; --c0b:#dfeaf8; --c1:#b4520a; --c1b:#fbe8d8; --c2:#2f7d32; --c2b:#e2f1e2; --c3:#7a3fb0; --c3b:#efe4f8;
+  --mon:#fbe3d6; --proc:#dfeaf8; --init:#e3f0dc;
+  --term:#16181c; --term-ink:#d6d6d0; --term-dim:#7c7f86; --prompt:#7bd88f; --path:#7aa7e0;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121313; --panel:#1b1c1d; --ink:#e8e8e3; --muted:#9a9a93; --line:#33342f; --soft:#242522;
+    --accent:#7fb0ea; --accent-bg:#1b2a3c; --ok:#7cc47f; --ok-bg:#1d2e1e; --warn:#e2a447; --warn-bg:#352813;
+    --bad:#f08a80; --bad-bg:#3a1d1a; --dead:#77776f; --zone:#202120; --chg:#4a3f12;
+    --c0:#82b4ee; --c0b:#1c2b3e; --c1:#f0a868; --c1b:#3a2717; --c2:#86cf89; --c2b:#1d311e; --c3:#c9a0f0; --c3b:#2e2140;
+    --mon:#3a261c; --proc:#1c2b3e; --init:#22311d;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121313; --panel:#1b1c1d; --ink:#e8e8e3; --muted:#9a9a93; --line:#33342f; --soft:#242522;
+  --accent:#7fb0ea; --accent-bg:#1b2a3c; --ok:#7cc47f; --ok-bg:#1d2e1e; --warn:#e2a447; --warn-bg:#352813;
+  --bad:#f08a80; --bad-bg:#3a1d1a; --dead:#77776f; --zone:#202120; --chg:#4a3f12;
+  --c0:#82b4ee; --c0b:#1c2b3e; --c1:#f0a868; --c1b:#3a2717; --c2:#86cf89; --c2b:#1d311e; --c3:#c9a0f0; --c3b:#2e2140;
+  --mon:#3a261c; --proc:#1c2b3e; --init:#22311d;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans)}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.sub a{color:var(--accent)}
+.theme{font:13px var(--sans);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+nav.tabs button{font:500 14px var(--sans);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav.tabs .n{opacity:.6;margin-right:4px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.bar button,.bar select{font:500 14px var(--sans);padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer}
+.bar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.bar button:disabled{opacity:.4;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grp{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.count{font:13px var(--mono);color:var(--muted);margin-left:auto}
+.prog{flex-basis:100%;height:4px;background:var(--soft);border-radius:4px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+.grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px}
+@media (max-width:1020px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:grid;gap:12px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.card h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card h2 a{color:var(--accent);text-transform:none;letter-spacing:0;font-weight:500;text-decoration:none}
+.code{font:13px/1.8 var(--mono);padding:8px 0;overflow-x:auto}
+.ln{display:flex;align-items:center;white-space:pre;padding-right:10px;border-left:3px solid transparent;transition:background .2s}
+.ln .no{width:32px;flex:none;text-align:right;padding-right:10px;color:var(--muted);user-select:none}
+.ln .mk{width:92px;flex:none;display:flex;gap:2px;flex-wrap:wrap}
+.ln .mk span{font:700 10px var(--sans);padding:0 4px;border-radius:4px;line-height:15px;color:#fff}
+.ln .src{white-space:pre}
+.ln.on{background:var(--soft)}
+.ln.ex{border-left-color:var(--ink);background:var(--chg)}
+.k{color:#8a3ffc}.c{color:var(--muted);font-style:italic}.f{color:var(--accent);font-weight:600}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .k{color:#c4a3ff}}
+:root[data-theme="dark"] .k{color:#c4a3ff}
+.log{max-height:260px;overflow:auto;padding:6px 0;margin:0;list-style:none;font-size:13.5px}
+.log li{display:flex;gap:8px;padding:6px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+.log li:first-child{background:var(--chg)}
+.log li .who{font:700 11px var(--sans);color:#fff;border-radius:4px;padding:1px 6px;flex:none;margin-top:2px}
+.log li .st{font:11px var(--mono);color:var(--muted);flex:none;width:28px;margin-top:3px}
+.log li code{font-size:12px}
+.stage{position:relative;height:290px;margin:10px 12px 12px;border-radius:12px;overflow:hidden}
+.zone{position:absolute;top:0;bottom:0;border-right:1px dashed var(--line);background:var(--zone)}
+.zone h3{margin:0;padding:8px 4px;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center}
+.zone.cs{background:var(--ok-bg)}
+.zone.cs.bad{background:var(--bad-bg);box-shadow:inset 0 0 0 2px var(--bad)}
+.zone.cs h3{color:var(--ok)}.zone.cs.bad h3{color:var(--bad)}
+.tok{position:absolute;width:46px;height:46px;margin-left:-23px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 13px var(--mono);color:#fff;transition:left .55s cubic-bezier(.4,0,.2,1),top .55s cubic-bezier(.4,0,.2,1),opacity .3s;box-shadow:0 0 0 3px var(--panel);z-index:2}
+.tok .tk{position:absolute;top:-8px;right:-14px;background:var(--panel);color:var(--ink);border:1.5px solid currentColor;border-radius:6px;font:700 11px var(--mono);padding:0 4px;line-height:16px}
+.tok .lb{position:absolute;top:50px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 10.5px var(--sans);color:var(--ink);background:var(--panel);padding:0 4px;border-radius:4px}
+.tok.act{box-shadow:0 0 0 3px var(--panel),0 0 0 6px var(--ink)}
+.tok.spin{animation:wob .6s ease-in-out infinite}
+.tok.sleep{opacity:.55}
+@keyframes wob{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.box{position:absolute;border-radius:10px;border:1.5px solid var(--line);font-size:12px}
+.box b{display:block;padding:5px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.box .big{font:700 26px var(--mono);text-align:center;color:var(--ink)}
+.box.hot{box-shadow:0 0 0 3px var(--warn)}
+.threads{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:0 12px 12px}
+.th{border-radius:10px;padding:8px 10px;border:1.5px solid}
+.th .nm{display:flex;justify-content:space-between;align-items:center;font:700 14px var(--mono)}
+.th .chip{font:600 10.5px var(--sans);padding:1px 7px;border-radius:999px;background:var(--panel)}
+.th .vars{font:11.5px var(--mono);color:var(--ink);margin-top:3px}
+.th .think{font-size:12.5px;margin-top:5px;color:var(--ink);font-style:italic}
+.mem{display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+.cell{border:1.5px solid var(--line);border-radius:9px;padding:6px 10px;min-width:92px;text-align:center;background:var(--panel);transition:background .3s}
+.cell.chg{background:var(--chg);border-color:var(--warn)}
+.cell small{display:block;font:11px var(--mono);color:var(--muted)}
+.cell span{font:700 17px var(--mono)}
+table.bk{border-collapse:collapse;margin:0 12px 12px;font:13px var(--mono);width:calc(100% - 24px)}
+table.bk th,table.bk td{border:1px solid var(--line);padding:5px 8px;text-align:center}
+table.bk th{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--soft)}
+table.bk td.chg{background:var(--chg)}
+.order{padding:0 12px 12px;font-size:13px;color:var(--muted)}
+.order b{color:var(--ink)}
+.explain{padding:14px 16px;min-height:96px}
+.explain p{margin:0}
+.explain .tag{display:inline-block;font:700 11px var(--sans);text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;margin-bottom:8px;color:#fff}
+.explain .note{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--accent-bg);font-size:14.5px}
+code{font:13px var(--mono);background:var(--soft);padding:1px 5px;border-radius:4px}
+.banner{margin:0;padding:9px 14px;font-weight:600;font-size:14px;border-top:1px solid var(--line)}
+.banner.bad{background:var(--bad-bg);color:var(--bad)}.banner.ok{background:var(--ok-bg);color:var(--ok)}.banner.n{background:var(--soft);color:var(--muted)}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+@media (max-width:860px){.row2{grid-template-columns:minmax(0,1fr)}}
+.term{background:var(--term);border-radius:12px;overflow:hidden;border:1px solid #2b2e34}
+.term .tb{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#23262c;color:#b9bbc1;font:12px var(--sans)}
+.term .tb i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.term .tb span{margin-left:6px}
+.term pre{margin:0;padding:10px 14px;font:12.5px/1.6 var(--mono);color:var(--term-ink);white-space:pre-wrap;word-break:break-word;min-height:150px}
+.term .pr{color:var(--prompt)}.term .pa{color:var(--path)}.term .dim{color:var(--term-dim)}.term .bad{color:#ff8a80}.term .good{color:#9be29b}
+.props{padding:12px 14px}
+.props table{width:100%;border-collapse:collapse;font-size:14px}
+.props td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.props tr:last-child td{border-bottom:0}
+.props td:first-child{color:var(--muted);width:42%}
+.yes{color:var(--ok);font-weight:600}.no{color:var(--bad);font-weight:600}.mid{color:var(--warn);font-weight:600}
+.hint{font-size:13px;color:var(--muted)}
+.deep{margin-top:12px}
+.deep .body{padding:6px 18px 18px}
+.deep h3{font-size:15px;margin:16px 0 6px;font-weight:650}
+.deep p,.deep li{font-size:14.5px}
+.deep ul{padding-left:20px}
+pre.pseudo{font:12.5px/1.6 var(--mono);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0;overflow-x:auto}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+@media (max-width:860px){.dgrid{grid-template-columns:minmax(0,1fr)}}
+.quiz{padding:8px 18px 18px}
+.q{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0;background:var(--panel)}
+.q h3{margin:0 0 8px;font-size:16px}
+.q .opts{display:grid;gap:6px;margin:8px 0}
+.q .opts button{text-align:left;font:14px var(--sans);padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer}
+.q .opts button.right{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:600}
+.q .opts button.wrong{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.q .ans{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--accent-bg);font-size:14.5px}
+footer{margin-top:18px;color:var(--muted);font-size:13px}
+footer a{color:var(--accent)}
+@media (prefers-reduced-motion: reduce){.tok{transition:none}.tok.spin{animation:none}.prog i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Monitors and classic mutual-exclusion algorithms</h1>
+    <div class="sub">CSAI-OS26 · Topics 3.11 to 3.15 (Session 7) · Monitor, Algorithm 1, Algorithm 2, Algorithm 3 (Peterson) and the Bakery algorithm · Real C programs in <a href="https://github.com/qai-science/CSAI-OS26/tree/main/monitors-and-algorithms">monitors-and-algorithms/</a></div>
+  </div>
+  <button class="theme" id="theme" type="button" aria-label="Toggle colour theme">Theme</button>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist"></nav>
+
+<div id="simUI">
+<div class="bar">
+  <div class="seg" role="group" aria-label="Mode">
+    <button type="button" id="mTour" aria-pressed="true">Guided tour</button>
+    <button type="button" id="mFree" aria-pressed="false">You are the scheduler</button>
+  </div>
+  <div class="grp" id="tourCtl">
+    <button id="reset" type="button" title="Reset (Home)" aria-label="Reset">&#x23EE;</button>
+    <button id="prev" type="button" title="Previous (Left arrow)">&#9664; Prev</button>
+    <button id="play" class="primary" type="button" title="Play / pause (Space)">&#9654; Play</button>
+    <button id="next" type="button" title="Next (Right arrow)">Next &#9654;</button>
+    <select id="speed" aria-label="Speed"><option value="2800">Slow</option><option value="1600" selected>Normal</option><option value="800">Fast</option></select>
+  </div>
+  <div class="grp" id="freeCtl" hidden>
+    <span id="runBtns" class="grp"></span>
+    <button id="runR" type="button">Random</button>
+    <button id="undo" type="button">Undo</button>
+    <button id="freset" type="button">Reset</button>
+  </div>
+  <span class="count" id="count"></span>
+  <div class="prog"><i id="progress"></i></div>
+</div>
+
+<div class="grid">
+  <div class="col">
+    <section class="card">
+      <h2><span>Code (coloured tag = next line for that thread)</span><a id="srclink" href="#" target="_blank" rel="noopener">Real C version</a></h2>
+      <div class="code" id="code"></div>
+    </section>
+    <section class="card">
+      <h2><span>Live narration (newest first)</span></h2>
+      <ol class="log" id="log"></ol>
+    </section>
+  </div>
+  <div class="col">
+    <section class="card">
+      <h2><span id="stageTitle">Where every thread is</span></h2>
+      <div class="stage" id="stage"></div>
+      <div class="threads" id="threads"></div>
+      <p class="banner n" id="banner"></p>
+    </section>
+    <section class="card">
+      <h2><span>Shared memory</span></h2>
+      <div id="mem"></div>
+    </section>
+    <section class="card">
+      <h2><span>What just happened</span></h2>
+      <div class="explain" id="explain" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<div class="row2">
+  <div class="term"><div class="tb"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span>Real run on the Ubuntu VM</span></div><pre id="real"></pre></div>
+  <section class="card"><h2><span>Requirements check</span></h2><div class="props" id="props"></div></section>
+</div>
+
+<section class="card deep"><h2><span id="deepTitle">In depth</span></h2><div class="body" id="deep"></div></section>
+</div>
+
+<section class="card deep" id="quizUI" hidden>
+  <h2><span>Check yourself: five questions from Session 7</span></h2>
+  <div class="quiz" id="quiz"></div>
+</section>
+
+<footer>
+  Build and run the real programs on Linux: <code>cd monitors-and-algorithms &amp;&amp; make run</code>.
+  Companion simulators: <a href="../../critical-section/simulation/">critical section lab</a> · <a href="../../pipes-namedpipes-sharedmemory/simulation/">shared memory, pipes and semaphores</a>.
+</footer>
+</div>
+
+<script>
+const REPO = "https://github.com/qai-science/CSAI-OS26/blob/main/";
+const PS = "$ ";
+const COLORS = ["var(--c0)","var(--c1)","var(--c2)","var(--c3)"];
+const BGS = ["var(--c0b)","var(--c1b)","var(--c2b)","var(--c3b)"];
+const go = (T, n) => { T.pc = n; };
+const B = v => v ? "true" : "false";
+const DONE = 99;
+
+/* ---------- monitor helpers ---------- */
+function handOff(S, Th, D){
+  if (S.entryQ.length){ const w = S.entryQ.shift(); S.owner = w; Th[w].st = "ready"; Th[w].pc = Th[w].resume; return " The monitor passes to <b>"+D.names[w]+"</b>, the first in the entry queue."; }
+  S.owner = null; return " The monitor is now empty.";
+}
+function monProg(kind, x){
+  if (kind === "deposit") return [
+    {ln:4, run:(S,T,me,D) => { T.resume = 1; if (S.owner === null){ S.owner = me; go(T,1); return D.names[me]+" calls <code>deposit("+x+")</code>. The monitor is empty, so it walks straight in. The compiler inserted the lock for you."; } T.st = "sleep"; S.entryQ.push(me); return D.names[me]+" calls <code>deposit("+x+")</code>, but "+D.names[S.owner]+" is inside. "+D.names[me]+" waits in the <b>entry queue</b>."; }},
+    {ln:5, run:(S,T,me,D) => { S.balance += x; go(T,2); return D.names[me]+" does <code>balance = balance + "+x+"</code>. Balance is now <b>"+S.balance+"</b>. Nobody else can touch it at the same moment."; }},
+    {ln:6, run:(S,T,me,D) => { go(T,3); if (S.condQ.length){ const w = S.condQ.shift(); S.entryQ.push(w); return D.names[me]+" calls <code>funds.signal()</code>. "+D.names[w]+" was waiting on <code>funds</code>, so it moves to the <b>entry queue</b>. "+D.names[me]+" keeps running: this is <b>signal-and-continue</b> (Mesa)."; } return D.names[me]+" calls <code>funds.signal()</code>, but nobody is waiting. The signal is simply <b>lost</b>: condition variables have no memory, unlike semaphores."; }},
+    {ln:7, run:(S,T,me,D,Th) => { go(T,DONE); return D.names[me]+" returns from <code>deposit</code> and leaves the monitor."+handOff(S,Th,D); }}
+  ];
+  return [
+    {ln:8, run:(S,T,me,D) => { T.resume = 1; if (S.owner === null){ S.owner = me; go(T,1); return D.names[me]+" calls <code>withdraw("+x+")</code>. The monitor is empty, so it walks straight in."; } T.st = "sleep"; S.entryQ.push(me); return D.names[me]+" calls <code>withdraw("+x+")</code>, but "+D.names[S.owner]+" is inside. "+D.names[me]+" waits in the <b>entry queue</b>."; }},
+    {ln:9, run:(S,T,me,D,Th) => { if (S.balance < x){ T.st = "sleep"; T.resume = 1; S.condQ.push(me); return D.names[me]+" checks <code>balance &lt; "+x+"</code>: "+S.balance+" is too little. <code>funds.wait()</code> puts it to sleep on the condition <b>and releases the monitor</b>, so others can deposit."+handOff(S,Th,D); } go(T,2); return D.names[me]+" checks <code>balance &lt; "+x+"</code>: "+S.balance+" is enough, so the <code>while</code> loop ends."; }},
+    {ln:10, run:(S,T,me,D) => { S.balance -= x; go(T,3); return D.names[me]+" does <code>balance = balance - "+x+"</code>. Balance is now <b>"+S.balance+"</b>."; }},
+    {ln:11, run:(S,T,me,D,Th) => { go(T,DONE); return D.names[me]+" returns from <code>withdraw</code> and leaves the monitor."+handOff(S,Th,D); }}
+  ];
+}
+
+/* ---------- algorithm programs ---------- */
+function alg1(me){ const wants = me === 0 ? 3 : 1; return [
+  {ln:2, z:"entry", run:(S,T,me,D) => { if (S.turn !== me){ T.spins++; T.spinning = true; return D.names[me]+" checks <code>turn != "+me+"</code>: turn is "+S.turn+", so it is not its turn. It <b>spins</b>."; } T.spinning = false; go(T,1); return D.names[me]+" checks <code>turn != "+me+"</code>: turn is "+me+", so it goes in."; }},
+  {ln:3, z:"cs", run:(S,T,me,D) => { go(T,2); return D.names[me]+" works in the <b>critical section</b> (entry "+(T.k+1)+" of "+wants+")."; }},
+  {ln:4, z:"exit", run:(S,T,me,D) => { S.turn = 1-me; go(T,3); return D.names[me]+" sets <code>turn = "+(1-me)+"</code>: it <b>must</b> hand the turn to the other thread, wanted or not."; }},
+  {ln:5, z:"rem", run:(S,T,me,D) => { T.k++; if (T.k < wants){ go(T,0); return D.names[me]+" finishes its remainder section and wants in again ("+T.k+" of "+wants+" done)."; } go(T,DONE); return D.names[me]+" is done with the critical section and stays in its remainder section for good."; }}
+];}
+function alg2(me){ return [
+  {ln:2, z:"entry", run:(S,T,me,D) => { S.flag[me] = true; go(T,1); return D.names[me]+" raises its flag: <code>flag["+me+"] = true</code>, meaning \"I want in\"."; }},
+  {ln:3, z:"entry", run:(S,T,me,D) => { const j = 1-me; if (S.flag[j]){ T.spins++; T.spinning = true; return D.names[me]+" sees <code>flag["+j+"] == true</code>, so it <b>waits</b> politely while "+D.names[j]+" wants in."; } T.spinning = false; go(T,2); return D.names[me]+" sees <code>flag["+j+"] == false</code>, so it goes in."; }},
+  {ln:4, z:"cs", run:(S,T,me,D) => { go(T,3); return D.names[me]+" works in the <b>critical section</b>."; }},
+  {ln:5, z:"exit", run:(S,T,me,D) => { S.flag[me] = false; go(T,4); return D.names[me]+" lowers its flag: <code>flag["+me+"] = false</code>."; }},
+  {ln:6, z:"rem", run:(S,T,me,D) => { T.k++; go(T, T.k < 2 ? 0 : DONE); return D.names[me]+" runs its remainder section"+(T.k < 2 ? " and will want in again." : " and is done."); }}
+];}
+function peterson(me){ return [
+  {ln:2, z:"entry", run:(S,T,me,D) => { S.flag[me] = true; go(T,1); return D.names[me]+" sets <code>flag["+me+"] = true</code>: \"I want in\"."; }},
+  {ln:3, z:"entry", run:(S,T,me,D) => { S.turn = 1-me; go(T,2); return D.names[me]+" sets <code>turn = "+(1-me)+"</code>: \"you go first\". Whoever writes <code>turn</code> <b>last</b> is the one who waits."; }},
+  {ln:4, z:"entry", run:(S,T,me,D) => { const j = 1-me; if (S.flag[j] && S.turn === j){ T.spins++; T.spinning = true; return D.names[me]+" tests <code>flag["+j+"] &amp;&amp; turn == "+j+"</code>: both true, so it <b>waits</b>."; } T.spinning = false; go(T,3); return D.names[me]+" tests <code>flag["+j+"] &amp;&amp; turn == "+j+"</code>: false ("+(S.flag[j] ? "it is not "+D.names[j]+"'s turn" : D.names[j]+" does not want in")+"), so it goes in."; }},
+  {ln:5, z:"cs", run:(S,T,me,D) => { go(T,4); return D.names[me]+" works in the <b>critical section</b>."; }},
+  {ln:6, z:"exit", run:(S,T,me,D) => { S.flag[me] = false; go(T,5); return D.names[me]+" sets <code>flag["+me+"] = false</code>. A waiting thread can now go in."; }},
+  {ln:7, z:"rem", run:(S,T,me,D) => { T.k++; go(T, T.k < 2 ? 0 : DONE); return D.names[me]+" runs its remainder section"+(T.k < 2 ? " and will want in again." : " and is done."); }}
+];}
+const NB = 4;
+const less = (a, i, b, k) => a < b || (a === b && i < k);   /* (a,i) < (b,k) */
+function bakery(me){
+  const nextJ = (T, me) => { T.j++; if (T.j === me) T.j++; };
+  return [
+  {ln:1, z:"entry", run:(S,T,me,D) => { S.choosing[me] = true; go(T,1); return D.names[me]+" sets <code>choosing["+me+"] = true</code>: \"I am picking a ticket, nobody compare against me yet\"."; }},
+  {ln:2, z:"entry", run:(S,T,me,D) => { T.m = Math.max(...S.number); go(T,2); return D.names[me]+" reads every ticket: ["+S.number.join(", ")+"]. The largest is <b>"+T.m+"</b>."; }},
+  {ln:2, z:"entry", run:(S,T,me,D) => { S.number[me] = T.m + 1; go(T,3); const tie = S.number.some((n,k) => k !== me && n === S.number[me]); return D.names[me]+" writes <code>number["+me+"] = "+(T.m+1)+"</code>."+(tie ? " <b>Same ticket as another process!</b> The process id will break the tie." : ""); }},
+  {ln:3, z:"entry", run:(S,T,me,D) => { S.choosing[me] = false; T.j = me === 0 ? 1 : 0; go(T,4); return D.names[me]+" sets <code>choosing["+me+"] = false</code>. Its ticket is final. Now it checks every other process, starting with "+D.names[T.j]+"."; }},
+  {ln:5, also:[4], z:"entry", run:(S,T,me,D) => { const j = T.j; if (S.choosing[j]){ T.spins++; T.spinning = true; return D.names[me]+" sees <code>choosing["+j+"] == true</code>: "+D.names[j]+" is still picking. It <b>waits</b> so it never compares against a half-written ticket."; } T.spinning = false; go(T,5); return D.names[me]+": "+D.names[j]+" is not choosing. Now compare tickets."; }},
+  {ln:6, also:[4], z:"entry", run:(S,T,me,D) => { const j = T.j, nj = S.number[j], ni = S.number[me]; if (nj && less(nj, j, ni, me)){ T.spins++; T.spinning = true; return D.names[me]+" compares: "+D.names[j]+" holds <b>("+nj+", "+(j+1)+")</b>, which is smaller than its own <b>("+ni+", "+(me+1)+")</b>. "+D.names[j]+" goes first, so it <b>waits</b>."; } T.spinning = false; const why = nj ? "("+nj+", "+(j+1)+") is larger than ("+ni+", "+(me+1)+")" : D.names[j]+" has no ticket"; nextJ(T, me); if (T.j >= NB){ go(T,6); return D.names[me]+": "+why+". Every check has passed, so it enters the <b>critical section</b>."; } go(T,4); return D.names[me]+": "+why+", so no need to wait. Next it checks "+D.names[T.j]+"."; }},
+  {ln:8, z:"cs", run:(S,T,me,D) => { go(T,7); return D.names[me]+" works in the <b>critical section</b> with ticket "+S.number[me]+"."; }},
+  {ln:8, z:"exit", run:(S,T,me,D) => { S.number[me] = 0; go(T,DONE); return D.names[me]+" sets <code>number["+me+"] = 0</code>: it throws its ticket away and leaves."; }}
+];}
+
+const DEMOS = [
+{ id:"monitor", label:"Monitor: bank account", kind:"monitor", file:"monitors-and-algorithms/monitor_bank.c", n:3, names:["ATM1","ATM2","ATM3"],
+  jobs:["withdraw(150)","deposit(100)","withdraw(30)"],
+  code:`monitor Account {
+    int balance = 100;                     /* initialisation */
+    condition funds;
+    void deposit(int x) {
+        balance = balance + x;
+        funds.signal();                    /* wake one waiter */
+    }
+    void withdraw(int x) {
+        while (balance < x) funds.wait();  /* sleep, let others in */
+        balance = balance - x;
+    }
+}`,
+  init:()=>({balance:100, owner:null, entryQ:[], condQ:[]}),
+  progs:()=>[monProg("withdraw",150), monProg("deposit",100), monProg("withdraw",30)],
+  tour:[0,1,0,2,1,1,1,2,2,2,0,0,0],
+  notes:{0:"A <b>monitor</b> keeps the shared data (<code>balance</code>) and the procedures that use it in one place. The data can only be reached through <code>deposit()</code> and <code>withdraw()</code>, and <b>only one thread can be active inside at a time</b>. Three ATMs call it at once: ATM1 wants 150, ATM2 deposits 100, ATM3 wants 30.",
+         2:"ATM2 is in the entry queue. Nobody wrote a lock or unlock call. The monitor does it automatically, so a forgotten <code>signal()</code> or a <code>wait</code>/<code>signal</code> in the wrong order cannot happen.",
+         3:"Balance 100 &lt; 150, so ATM1 waits on <code>funds</code>. It <b>leaves the monitor while it sleeps</b>. If it kept the monitor, nobody could ever deposit: a deadlock.",
+         6:"ATM1 is back in the entry queue, <b>behind ATM3</b>. ATM3 will get in first.",
+         10:"ATM1 re-checks <code>balance &lt; 150</code>. That is why the code says <code>while</code>, not <code>if</code>. If ATM3 had withdrawn 100 instead of 30, the balance would be 100 again and ATM1 would have to wait once more.",
+         13:"All three finished. Balance 100 + 100 − 30 − 150 = <b>20</b>, with no lost update, even though the ATMs were interleaved. The real C version (mutex + condition variable) kept the balance exactly at 100 after 4 million operations; without the monitor it ended at 501, 237 and 102."},
+  props:[["Mutual exclusion","yes","The monitor lets one thread in at a time"],["Waiting for a condition","yes","wait() sleeps and releases the monitor"],["Forgotten unlock possible?","yes","No: the compiler adds lock and unlock"],["Signal semantics","mid","Mesa (signal-and-continue), so re-check with while"]],
+  real:[PS+"./monitor_bank unsafe", "unsafe : 2 ATMs x 1,000,000 x (deposit 1, withdraw 1): balance = 501 (expected 100)", PS+"./monitor_bank unsafe", "unsafe : 2 ATMs x 1,000,000 x (deposit 1, withdraw 1): balance = 237 (expected 100)", PS+"./monitor_bank", "monitor: 2 ATMs x 1,000,000 x (deposit 1, withdraw 1): balance = 100 (expected 100)", "[    1 ms] ATM1: withdraw(150), balance is only 100, waiting...", "[ 1002 ms] ATM2: deposit(100)", "[ 1003 ms] ATM1: got 150, balance now 50"],
+  deepTitle:"Monitors: the lock lives with the data",
+  deep:`<div class="dgrid"><div>
+<h3>The four parts of a monitor</h3>
+<ul><li><b>Shared data</b>, here <code>balance</code>. It is private: no code outside the monitor can touch it.</li><li><b>Procedures</b>, here <code>deposit</code> and <code>withdraw</code>, the only way in.</li><li><b>Initialisation code</b>, run once: <code>balance = 100</code>.</li><li>An implicit <b>lock</b> and an <b>entry queue</b>: one thread active inside, the others wait at the door.</li></ul>
+<h3>Condition variables</h3>
+<p>Mutual exclusion alone is not enough: ATM1 needs to <i>wait until</i> there is money. A <b>condition variable</b> (<code>condition funds</code>) gives two operations:</p>
+<ul><li><code>funds.wait()</code>: release the monitor and sleep on this condition.</li><li><code>funds.signal()</code>: wake one thread sleeping on it. If none is sleeping, nothing happens. Unlike <code>sem_post</code>, the signal is not remembered.</li></ul>
+<h3>Hoare vs Mesa</h3>
+<p><b>Hoare</b> (signal-and-wait): the woken thread runs immediately, so the condition is guaranteed true. <b>Mesa</b> (signal-and-continue), used by Java, C# and POSIX: the signaller keeps running and the woken thread queues to re-enter. By the time it gets in, someone else may have changed the data, so <b>always wait in a <code>while</code> loop</b>. The simulation shows this: ATM3 got in before ATM1.</p>
+</div><div>
+<h3>Monitors in real languages</h3>
+<pre class="pseudo"><span class="c">// Java: synchronized methods form a monitor</span>
+class Account {
+    private int balance = 100;
+    synchronized void deposit(int x) { balance += x; notify(); }
+    synchronized void withdraw(int x) throws InterruptedException {
+        while (balance &lt; x) wait();
+        balance -= x;
+    }
+}
+<span class="c">// C#:  lock (this) { ... Monitor.Wait(this); ... Monitor.Pulse(this); }</span></pre>
+<p><b>C has no monitors</b>, so POSIX gives the pieces and you assemble them yourself. That is exactly what <code>monitor_bank.c</code> does:</p>
+<pre class="pseudo">pthread_mutex_lock(&amp;a-&gt;lock);              <span class="c">// enter</span>
+while (a-&gt;balance &lt; x)
+    pthread_cond_wait(&amp;a-&gt;funds, &amp;a-&gt;lock);  <span class="c">// wait</span>
+a-&gt;balance -= x;
+pthread_mutex_unlock(&amp;a-&gt;lock);            <span class="c">// leave</span></pre>
+<h3>Why monitors are safer than semaphores</h3>
+<p>With semaphores every programmer must remember <code>wait</code> before and <code>signal</code> after, in the right order, on every path. One slip, such as a forgotten <code>signal</code> or swapped calls, deadlocks or breaks mutual exclusion. A monitor moves that responsibility into the compiler and runtime.</p>
+</div></div>`},
+
+{ id:"alg1", label:"Algorithm 1: turn", kind:"alg", file:"monitors-and-algorithms/alg1_turn.c", n:2, names:["T0","T1"],
+  code:`/* Pi, other is j = 1 - i;  shared: int turn = 0 */
+while (turn != i) ;      /* wait for my turn */
+    critical section
+turn = j;                /* hand the turn over */
+    remainder section`,
+  init:()=>({turn:0}), progs:()=>[alg1(0), alg1(1)],
+  tour:[0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
+  notes:{0:"<b>Algorithm 1 (strict alternation).</b> One shared variable <code>turn</code> says whose turn it is. T0 wants the critical section <b>3 times</b>, T1 only <b>once</b>, exactly as in <code>alg1_turn.c</code>.",
+         5:"T0 wants in again, but <code>turn = 1</code>, so it must wait for T1 even though the critical section is <b>empty</b>.",
+         9:"T1 handed the turn back and is done for good.",
+         16:"<b>No progress.</b> The critical section is empty and T1 is not even interested, yet T0 can never enter, because only T1 could set <code>turn = 0</code>. Mutual exclusion holds, but the progress requirement fails. The real program got stuck in exactly this state after 2 of 3 entries."},
+  props:[["Mutual exclusion","yes","turn holds one value, so only one thread can pass"],["Progress","no","A thread in its remainder section blocks the other"],["Bounded waiting","yes","Strict alternation: you wait at most one turn"],["Verdict","no","Unusable unless both threads always alternate"]],
+  real:[PS+"./alg1_turn", "T0: in critical section (entry 1)", "T1: in critical section (entry 1)", "T1: done, stays in its remainder section", "T0: in critical section (entry 2)", "after 2 s: T0 entered 2 of 3 times, turn = 1", "NO PROGRESS: the critical section is free and T1 is not interested,", "             but T0 still waits for turn == 0"],
+  deepTitle:"Algorithm 1: strict alternation",
+  deep:`<div class="dgrid"><div>
+<h3>Why mutual exclusion holds</h3>
+<p>To enter, Ti needs <code>turn == i</code>. <code>turn</code> is either 0 or 1, never both, so at most one thread can be past the <code>while</code> loop.</p>
+<h3>Why progress fails</h3>
+<p>The progress rule says that a thread in its remainder section must not stop others from entering. Here, after T0 leaves it sets <code>turn = 1</code>. If T1 is busy elsewhere or finished, T0 can never come back in. The two threads are forced into the pattern T0, T1, T0, T1...</p>
+</div><div>
+<h3>Where it is acceptable</h3>
+<p>Strict alternation is fine when the threads really do take turns forever, as in a two-stage ping-pong pipeline. As a general lock it fails, because threads rarely need the critical section at the same rate.</p>
+<h3>What it teaches</h3>
+<p><code>turn</code> alone records <b>whose turn it is</b>, but not <b>who actually wants in</b>. Algorithm 2 tries the opposite: it records who wants in and forgets about turns.</p>
+</div></div>`},
+
+{ id:"alg2", label:"Algorithm 2: flags", kind:"alg", file:"monitors-and-algorithms/alg2_flag.c", n:2, names:["T0","T1"],
+  code:`/* Pi;  shared: boolean flag[2] = {false, false} */
+flag[i] = true;          /* I want in */
+while (flag[j]) ;        /* wait while you want in */
+    critical section
+flag[i] = false;
+    remainder section`,
+  init:()=>({flag:[false,false]}), progs:()=>[alg2(0), alg2(1)],
+  tour:[0,0,0,1,1,0,1,1,1,1,0, 0,1,0,1,0,1],
+  notes:{0:"<b>Algorithm 2.</b> Each thread raises <code>flag[i]</code> to say \"I want in\", then waits while the other's flag is up. Now a thread in its remainder section (flag down) no longer blocks anyone.",
+         5:"T1 waits while T0 is inside: mutual exclusion works, and when T0 lowers its flag, T1 gets in.",
+         11:"Both threads come back. Watch what happens if they raise their flags at nearly the same moment.",
+         13:"Both flags are up and each thread is waiting for the other to lower its flag. Neither ever will.",
+         17:"<b>Deadlock.</b> Both threads spin forever, waiting for each other. The real <code>alg2_flag</code> deadlocked on every run, after anywhere from 0 to 17,000 entries, with <code>flag[0] = flag[1] = 1</code>."},
+  props:[["Mutual exclusion","yes","You only enter after seeing the other flag down"],["Progress","no","Both flags up means both wait forever (deadlock)"],["Bounded waiting","—","Meaningless once both are stuck"],["Verdict","no","Swapping the two lines breaks mutual exclusion instead"]],
+  real:[PS+"./alg2_flag", "DEADLOCK after T0 = 0 and T1 = 5268 entries", "flag[0] = 1, flag[1] = 1: each thread waits for the other forever", PS+"./alg2_flag", "DEADLOCK after T0 = 16989 and T1 = 6 entries", "flag[0] = 1, flag[1] = 1: each thread waits for the other forever"],
+  deepTitle:"Algorithm 2: flags without turns",
+  deep:`<div class="dgrid"><div>
+<h3>Why mutual exclusion holds</h3>
+<p>Ti only enters after it has set its own flag <b>and</b> seen the other flag down. If both were inside, each would have seen the other's flag down after raising its own, which is impossible in sequential order.</p>
+<h3>Why it deadlocks</h3>
+<pre class="pseudo">T0: flag[0] = true
+T1: flag[1] = true
+T0: while (flag[1]) ;   <span class="c">// true: wait</span>
+T1: while (flag[0]) ;   <span class="c">// true: wait  → forever</span></pre>
+</div><div>
+<h3>"Just check first, then set"?</h3>
+<p>Swap the two lines (wait while <code>flag[j]</code>, then set <code>flag[i]</code>) and the deadlock disappears. But now both threads can see the other's flag down, both set their own, and <b>both enter</b>: mutual exclusion is gone instead.</p>
+<h3>The fix</h3>
+<p>Algorithm 1 had no deadlock but no progress. Algorithm 2 has progress, until it deadlocks. <b>Peterson</b> combines the flags (who wants in) with <code>turn</code> (who yields in a tie), which gives all three properties.</p>
+</div></div>`},
+
+{ id:"peterson", label:"Algorithm 3: Peterson", kind:"alg", file:"critical-section/cs_peterson.c", n:2, names:["T0","T1"],
+  code:`/* Pi;  shared: boolean flag[2]; int turn */
+flag[i] = true;                   /* I want in        */
+turn = j;                         /* but you go first */
+while (flag[j] && turn == j) ;    /* wait             */
+    critical section
+flag[i] = false;
+    remainder section`,
+  init:()=>({flag:[false,false], turn:0}), progs:()=>[peterson(0), peterson(1)],
+  tour:[0,1,1,0,0,1,0,1,1,1,0,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0],
+  notes:{0:"<b>Algorithm 3: Peterson's solution.</b> It uses the flags from Algorithm 2 (\"I want in\") <b>and</b> the turn from Algorithm 1, but only as a tie-breaker.",
+         4:"Both flags are up, the exact situation that deadlocked Algorithm 2. But T0 wrote <code>turn</code> last (turn = 1), so T0 is the one that yields.",
+         6:"T1 goes in because <code>turn == 1</code>. No deadlock, and still <b>mutual exclusion</b>.",
+         11:"T1's flag is down, so T0 enters. That is <b>progress</b>: nobody outside blocks it.",
+         14:"T1 is back and wants in again, but it just set <code>turn = 0</code>, so it must let T0 finish first. It cannot cut in twice in a row. That is <b>bounded waiting</b>.",
+         27:"All entries done, and the three requirements held at every step. On real hardware the same code needs memory fences: the plain version lost 12–39 updates per run on the VM. See the critical section lab."},
+  props:[["Mutual exclusion","yes","turn is 0 or 1, so one of two contenders must wait"],["Progress","yes","A thread with flag = false never blocks the other"],["Bounded waiting","yes","At most one entry by the other thread before you"],["Limits","mid","Two threads only, busy waiting, needs fences on real CPUs"]],
+  real:[PS+"cd ../critical-section", PS+"./cs_peterson plain", "peterson-p: counter =  3999968  expected 4000000  lost 32  (941 ms)", PS+"./cs_peterson", "peterson  : counter =  4000000  expected 4000000  lost 0  (1330 ms)", "", "# plain = textbook code: the CPU reorders store and load", "# default = C11 seq_cst atomics: correct"],
+  deepTitle:"Algorithm 3: Peterson's solution",
+  deep:`<div class="dgrid"><div>
+<h3>Proof sketch: the three requirements</h3>
+<ul><li><b>Mutual exclusion:</b> if both were inside, both tests passed. Both flags are true, so both must have seen <code>turn</code> pointing at itself. But <code>turn</code> holds one value, so the thread that wrote it last is still waiting.</li><li><b>Progress:</b> if Tj is not interested, <code>flag[j]</code> is false and Ti enters immediately. If both are interested, <code>turn</code> decides at once, so there is no endless postponement.</li><li><b>Bounded waiting:</b> when Tj leaves and tries again, it sets <code>turn = i</code> itself, which lets Ti in. Ti waits for at most one entry by Tj.</li></ul>
+</div><div>
+<h3>From 2 threads to n threads</h3>
+<p>Peterson's idea generalises to n threads with a <i>filter lock</i> of n − 1 levels, but it gets slow. The classic n-process answer is Lamport's <b>Bakery</b> algorithm, the next tab.</p>
+<h3>On real machines</h3>
+<p>Peterson assumes each read sees the latest write, in program order. Real CPUs and compilers reorder memory operations, so the code must use atomic operations with fences, as <code>cs_peterson.c</code> shows. In practice we use hardware instructions (TestAndSet, CAS) and OS locks instead. Peterson is the clearest way to <b>reason</b> about the problem.</p>
+</div></div>`},
+
+{ id:"bakery", label:"Bakery (n = 4)", kind:"alg", file:"monitors-and-algorithms/bakery.c", n:4, names:["P1","P2","P3","P4"],
+  code:`choosing[i] = true;
+number[i] = 1 + max(number[0], ..., number[n-1]);
+choosing[i] = false;
+for (j = 0; j < n; j++) {
+    while (choosing[j]) ;
+    while (number[j] && (number[j],j) < (number[i],i)) ;
+}
+/* critical section */    number[i] = 0;`,
+  init:()=>({choosing:[false,false,false,false], number:[0,0,0,0]}),
+  progs:()=>[bakery(0), bakery(1), bakery(2), bakery(3)],
+  prefix:[2,2,2,2, 2,2,2,2,2,2, 0,0,0,0, 1,3,1,3,1,3,1,3, 0,0,0,0, 3,3, 2,2],
+  notes:{0:"<b>Lamport's Bakery algorithm</b>, for any number of processes: take a number, as in a bakery, and the <b>smallest ticket is served first</b>. Four processes, P1 to P4. Ties are broken by the process id: compare the pair <code>(ticket, id)</code>.",
+         4:"P3 holds ticket <b>1</b>. Nobody else had a ticket, so the max was 0.",
+         10:"P3 checked all three others: none was choosing and none had a smaller ticket. P3 is <b>in the critical section</b>.",
+         14:"P1 saw the largest ticket was 1 (P3's), so it took <b>2</b>.",
+         18:"P2 and P4 both read the tickets <b>before either wrote its own</b>. Both saw max = 2.",
+         20:"So P2 and P4 both hold ticket <b>3</b>. A tie! Order: P2 has (3, 2) and P4 has (3, 4), so <b>P2 goes before P4</b>, the smaller id.",
+         22:"Final tickets: P3 = 1, P1 = 2, P2 = 3, P4 = 3. Service order is P3, P1, P2, P4: first come, first served by ticket.",
+         26:"P1 is waiting at P3, who holds the smaller ticket 1.",
+         28:"P4 is waiting at P1: (2, 1) is smaller than (3, 4).",
+         30:"P3 left and threw its ticket away (number = 0). The others now pass their checks in ticket order.",
+         end:"Everyone was served in order <b>P3, P1, P2, P4</b>, and never two in the critical section. The real <code>bakery.c</code> ran 4 threads × 100,000 entries with 0 lost updates. Its tickets grew as high as 395,668, because the number only resets when every process is idle at once."},
+  props:[["Mutual exclusion","yes","(ticket, id) pairs are all different, so exactly one is smallest"],["Progress","yes","The smallest waiting ticket always gets in"],["Bounded waiting","yes","First come, first served: later arrivals get bigger tickets"],["Cost","mid","n checks per entry, tickets unbounded, no special hardware"]],
+  real:[PS+"./bakery", "bakery    : counter =  400000  expected 400000  lost 0  (244 ms)", "largest ticket handed out: 313319,  spins on a tied ticket: 35919", PS+"./bakery", "bakery    : counter =  400000  expected 400000  lost 0  (369 ms)", "largest ticket handed out: 395668,  spins on a tied ticket: 16555", "", "# 4 threads x 100,000 entries, C11 seq_cst atomics"],
+  deepTitle:"The Bakery algorithm in depth",
+  deep:`<div class="dgrid"><div>
+<h3>The idea</h3>
+<p>On arrival, each process takes a ticket one higher than any ticket it can see, <code>1 + max(number)</code>. It then waits for every process holding a <b>smaller</b> pair <code>(number[j], j)</code>. Comparing pairs means <code>(a, i) &lt; (b, k)</code> if <code>a &lt; b</code>, or <code>a == b</code> and <code>i &lt; k</code>.</p>
+<h3>Why ties happen</h3>
+<p>Taking a ticket is not atomic: reading the max and writing your number are separate steps. Two processes can read the same max and take the same number, as P2 and P4 did here. The process id makes every pair unique, so there is always exactly one \"smallest\".</p>
+<h3>Why <code>choosing[]</code> is needed</h3>
+<p>Without it, P1 might look at P4 while P4 has read the max but not yet written its ticket. P1 sees <code>number[4] = 0</code>, thinks P4 is not interested, and walks in. Then P4 writes a ticket that is smaller as a pair and also walks in: two inside. <code>while (choosing[j])</code> waits until P4's ticket is final before comparing.</p>
+</div><div>
+<h3>The three requirements</h3>
+<ul><li><b>Mutual exclusion:</b> a process in the critical section has the smallest pair among all processes with tickets, and pairs are unique.</li><li><b>Progress:</b> the process with the smallest pair never waits on anyone.</li><li><b>Bounded waiting:</b> a process that arrives after you takes a bigger ticket, so it cannot overtake you. Service is first come, first served.</li></ul>
+<h3>Costs and remarks</h3>
+<ul><li>Every entry scans all n processes, which is O(n).</li><li>Ticket numbers can grow without bound while processes keep overlapping: 395,668 on the VM.</li><li>It needs <b>no special hardware</b>. Lamport even showed it works when reads that overlap a write return garbage.</li><li>On modern CPUs it still needs memory fences, just like Peterson.</li></ul>
+</div></div>`},
+
+{ id:"quiz", label:"Check yourself", kind:"quiz" }
+];
+
+const QUIZ = [
+  {q:"Algorithm 1 (strict alternation) guarantees mutual exclusion. Which requirement does it break?", o:["Mutual exclusion","Progress","Bounded waiting","None of them"], a:1, e:"<b>Progress.</b> After T0 leaves, <code>turn = 1</code>. If T1 never wants in again, T0 can never re-enter, even though the critical section is empty."},
+  {q:"In Algorithm 2, both threads set their flags to true at almost the same moment. What happens?", o:["Both enter the critical section","The one with the lower id enters","Both wait forever (deadlock)","The OS breaks the tie"], a:2, e:"<b>Deadlock.</b> Each sees the other's flag up and waits for it to drop. Neither ever lowers its flag, so both wait forever."},
+  {q:"In Peterson's solution both flags are true. Which thread enters first?", o:["The one that set its flag first","The one that wrote turn last","The one that did NOT write turn last","Thread 0, always"], a:2, e:"Each thread writes <code>turn = other</code>. The value that sticks is from the <b>last</b> writer, and that thread yields. So the thread that did <b>not</b> write <code>turn</code> last goes in."},
+  {q:"In the Bakery algorithm, P2 and P4 both hold ticket 4. Who enters first?", o:["P4, because it arrived later","P2, because (4, 2) < (4, 4)","Whoever reads the tickets first","Both enter together"], a:1, e:"Ties are broken by process id: compare <code>(number, id)</code>. <code>(4, 2) &lt; (4, 4)</code>, so <b>P2</b> enters before P4."},
+  {q:"Why does the monitor's withdraw() use while (balance < x) wait(); instead of if?", o:["while is faster than if","Under signal-and-continue, the condition may be false again when the thread re-enters","The compiler requires a loop","To avoid starvation of depositors"], a:1, e:"With Mesa semantics the woken thread only re-queues for the monitor. Another thread, such as ATM3 in the simulation, may get in first and change <code>balance</code>. The thread must <b>re-check</b> the condition, hence <code>while</code>."}
+];
+
+/* ---------------- engine ---------------- */
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TOK = /(\/\*.*?\*\/)|\b(monitor|int|void|condition|while|for|boolean|true|false)\b|\b(deposit|withdraw|wait|signal|max)\b/g;
+function hl(line){ let o = "", last = 0, m; TOK.lastIndex = 0; while ((m = TOK.exec(line))){ o += esc(line.slice(last, m.index)); o += '<span class="'+(m[1]?"c":m[2]?"k":"f")+'">'+esc(m[0])+"</span>"; last = TOK.lastIndex; } return o + esc(line.slice(last)); }
+
+let demo = 0, mode = "tour", tstep = 0, hist = [], timer = null;
+
+function replay(D, h){
+  const S = D.init(), P = D.progs();
+  const Th = Array.from({length:D.n}, () => ({pc:0, k:0, j:0, m:null, spins:0, st:"ready", spinning:false, resume:0}));
+  let last = null; const log = [];
+  h.forEach((me, idx) => {
+    const T = Th[me], ins = P[me][T.pc];
+    if (!ins || T.st === "sleep") return;
+    const before = JSON.stringify(S), bs = JSON.parse(before);
+    const msg = ins.run(S, T, me, D, Th);
+    const changed = Object.keys(S).filter(k => JSON.stringify(S[k]) !== JSON.stringify(bs[k]));
+    last = {me, ln:[ins.ln].concat(ins.also||[]), msg, changed, before:bs};
+    log.push({me, msg, idx:idx+1});
+  });
+  return {S, Th, P, last, log};
+}
+const runnable = (st, i) => st.Th[i].st !== "sleep" && st.P[i][st.Th[i].pc] !== undefined;
+const zoneOf = (st, i) => { const ins = st.P[i][st.Th[i].pc]; return ins ? ins.z : "done"; };
+
+function autoTour(D){
+  if (D.tour) return D.tour;
+  const h = D.prefix.slice();
+  let lastPick = -1;
+  for (let guard = 0; guard < 400; guard++){
+    const st = replay(D, h);
+    const cand = [...Array(D.n).keys()].filter(i => runnable(st, i));
+    if (!cand.length) break;
+    const prog = cand.filter(i => { const a = JSON.stringify([st.S, st.Th[i].pc, st.Th[i].j]); const s2 = replay(D, h.concat([i])); return JSON.stringify([s2.S, s2.Th[i].pc, s2.Th[i].j]) !== a; });
+    const pool = prog.length ? prog : cand;
+    const ordered = pool.slice().sort((a,b) => ((a - lastPick - 1 + D.n) % D.n) - ((b - lastPick - 1 + D.n) % D.n));
+    lastPick = ordered[0]; h.push(lastPick);
+  }
+  return h;
+}
+DEMOS.forEach(D => { if (D.kind !== "quiz") D.tourSeq = autoTour(D); });
+
+function renderTabs(){
+  $("tabs").innerHTML = DEMOS.map((d,i) => '<button role="tab" type="button" aria-selected="'+(i===demo)+'" data-i="'+i+'"><span class="n">'+(i+1)+'</span>'+esc(d.label)+'</button>').join("");
+  $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => select(+b.dataset.i));
+}
+function select(i){
+  stop(); demo = i; tstep = 0; hist = [];
+  renderTabs();
+  const D = DEMOS[demo];
+  $("simUI").hidden = D.kind === "quiz"; $("quizUI").hidden = D.kind !== "quiz";
+  if (D.kind === "quiz") renderQuiz(); else { buildStatic(); render(); }
+  try{ history.replaceState(null, "", "#"+D.id); }catch(e){}
+}
+
+function buildStatic(){
+  const D = DEMOS[demo];
+  $("code").innerHTML = D.code.split("\n").map((l,i) => '<div class="ln" data-n="'+(i+1)+'"><span class="no">'+(i+1)+'</span><span class="mk"></span><span class="src">'+hl(l)+'</span></div>').join("");
+  $("srclink").href = REPO + D.file; $("srclink").textContent = "Real C version: " + D.file.split("/").pop();
+  $("runBtns").innerHTML = D.names.map((n,i) => '<button type="button" data-r="'+i+'" style="background:'+BGS[i]+';border-color:'+COLORS[i]+';color:'+COLORS[i]+'">Run '+n+' &#9654;</button>').join("");
+  $("runBtns").querySelectorAll("button").forEach(b => b.onclick = () => runT(+b.dataset.r));
+  $("real").innerHTML = D.real.map(l => l.startsWith(PS) ? '<span class="pr">cosmos@vm</span>:<span class="pa">~/CSAI-OS26</span>$ ' + esc(l.slice(PS.length)) : l.startsWith("#") ? '<span class="dim">'+esc(l)+'</span>' : /(lost [1-9]|DEADLOCK|NO PROGRESS|unsafe :)/.test(l) ? '<span class="bad">'+esc(l)+'</span>' : /(lost 0|balance = 100|got 150)/.test(l) ? '<span class="good">'+esc(l)+'</span>' : esc(l)).join("\n");
+  const cls = {yes:"yes", no:"no", mid:"mid", "—":""}, txt = {yes:"Yes", no:"No", mid:"Partly", "—":"—"};
+  $("props").innerHTML = "<table>" + D.props.map(([k,v,n]) => '<tr><td>'+esc(k)+'</td><td><span class="'+cls[v]+'">'+txt[v]+'</span>'+(n ? '<br><span class="hint">'+esc(n)+'</span>' : "")+'</td></tr>').join("") + "</table>";
+  $("deepTitle").textContent = D.deepTitle; $("deep").innerHTML = D.deep;
+  buildStage(D);
+}
+
+/* ---------- stage ---------- */
+const ZONES = [["rem","Remainder"],["entry","Entry: asking"],["cs","Critical section"],["exit","Exit"]];
+function buildStage(D){
+  const st = $("stage");
+  if (D.kind === "monitor"){
+    $("stageTitle").textContent = "The monitor (one thread active inside)";
+    st.style.height = "340px";
+    st.innerHTML =
+      '<div class="box" style="left:0;top:0;width:20%;height:100%;background:var(--zone)"><b>Entry queue</b></div>' +
+      '<div class="box" id="monbox" style="left:22%;top:0;width:58%;height:100%;background:var(--soft);border-width:2px;border-color:var(--ink)"><b style="text-align:center;color:var(--ink);font-size:12px">monitor Account</b></div>' +
+      '<div class="box" id="bxData" style="left:24%;top:30px;width:54%;height:58px;background:var(--mon)"><b>shared data</b><div class="big" id="bal" style="margin-top:-8px"></div></div>' +
+      '<div class="box" id="bxDep" style="left:24%;top:98px;width:26.5%;height:84px;background:var(--proc)"><b>deposit()</b></div>' +
+      '<div class="box" id="bxWd" style="left:51.5%;top:98px;width:26.5%;height:84px;background:var(--proc)"><b>withdraw()</b></div>' +
+      '<div class="box" id="bxCond" style="left:24%;top:192px;width:54%;height:86px;background:var(--warn-bg)"><b>condition funds: sleeping until signal()</b></div>' +
+      '<div class="box" style="left:24%;top:288px;width:54%;height:42px;background:var(--init)"><b>initialisation: balance = 100</b></div>' +
+      '<div class="box" style="left:82%;top:0;width:18%;height:100%;background:var(--zone)"><b>Outside</b></div>' +
+      D.names.map((n,i) => '<div class="tok" id="tok'+i+'" style="background:'+COLORS[i]+';left:91%;top:40px">'+n.replace("ATM","A")+'<span class="lb"></span></div>').join("");
+  } else {
+    $("stageTitle").textContent = "Where every thread is";
+    st.style.height = (D.n > 2 ? 372 : 250) + "px";
+    st.innerHTML = ZONES.map(([z,l],k) => '<div class="zone '+(z==="cs"?"cs":"")+'" id="z_'+z+'" style="left:'+(k*25)+'%;width:25%"><h3>'+l+'</h3></div>').join("") +
+      D.names.map((n,i) => '<div class="tok" id="tok'+i+'" style="background:'+COLORS[i]+';left:12.5%;top:44px">'+n+'<span class="tk" style="color:'+COLORS[i]+'" hidden></span><span class="lb"></span></div>').join("");
+  }
+}
+function place(D, st){
+  const pos = [];
+  if (D.kind === "monitor"){
+    const S = st.S;
+    D.names.forEach((n,i) => {
+      const T = st.Th[i];
+      let x, y, lb = "";
+      const qi = S.entryQ.indexOf(i), ci = S.condQ.indexOf(i);
+      if (S.owner === i){ const dep = D.jobs[i].startsWith("deposit"); x = dep ? 37 : 64.5; y = 122; lb = D.jobs[i]; }
+      else if (qi >= 0){ x = 10; y = 40 + qi*72; lb = "waiting to enter"; }
+      else if (ci >= 0){ x = 36 + ci*14; y = 218; lb = "needs "+D.jobs[i].match(/\d+/)[0]; }
+      else if (!st.P[i][T.pc]){ x = 91; y = 200 + i*0; lb = "done"; const doneIdx = [0,1,2].filter(k => !st.P[k][st.Th[k].pc] && S.owner !== k).indexOf(i); y = 190 + doneIdx*52; }
+      else { const waiting = [0,1,2].filter(k => st.Th[k].pc === 0 && st.Th[k].st !== "sleep" && S.owner !== k); x = 91; y = 36 + waiting.indexOf(i)*52; lb = D.jobs[i]; }
+      pos.push({x, y, lb});
+    });
+    return pos;
+  }
+  const count = {rem:0, entry:0, cs:0, exit:0};
+  D.names.forEach((n,i) => {
+    let z = zoneOf(st, i); const fin = z === "done"; if (fin) z = "rem";
+    const k = ZONES.findIndex(q => q[0] === z);
+    const y = 54 + count[z]*76; count[z]++;
+    const T = st.Th[i];
+    let lb = fin ? "done" : T.st === "sleep" ? "sleeping" : T.spinning ? "waiting" : z === "cs" ? "inside" : "";
+    if (D.id === "bakery" && st.S.choosing[i]) lb = "choosing";
+    pos.push({x: k*25 + 12.5, y, lb, ticket: D.id === "bakery" ? st.S.number[i] : null});
+  });
+  return pos;
+}
+
+function statusOf(D, st, i){
+  const T = st.Th[i];
+  if (!st.P[i][T.pc]) return ["done","var(--dead)"];
+  if (D.kind === "monitor"){
+    if (st.S.condQ.includes(i)) return ["waiting on funds","var(--warn)"];
+    if (st.S.entryQ.includes(i)) return ["in entry queue","var(--warn)"];
+    if (st.S.owner === i) return ["inside monitor","var(--ok)"];
+    return ["not called yet","var(--muted)"];
+  }
+  if (T.spinning) return ["waiting","var(--bad)"];
+  const z = zoneOf(st, i);
+  return {rem:["remainder","var(--muted)"], entry:["entry section","var(--accent)"], cs:["in critical section","var(--ok)"], exit:["leaving","var(--accent)"]}[z];
+}
+function think(D, st, i){
+  const T = st.Th[i], S = st.S, ins = st.P[i][T.pc];
+  if (!ins) return "Finished.";
+  const j = 1 - i;
+  if (D.kind === "monitor"){
+    if (S.condQ.includes(i)) return "Asleep: I need "+D.jobs[i].match(/\d+/)[0]+" but the balance is "+S.balance+".";
+    if (S.entryQ.includes(i)) return "Waiting at the door: "+D.names[S.owner]+" is inside.";
+    if (S.owner === i) return "Inside "+D.jobs[i].split("(")[0]+"(). Nobody else can touch balance now.";
+    return "About to call "+D.jobs[i]+".";
+  }
+  if (D.id === "alg1"){
+    if (ins.z === "entry") return S.turn === i ? "Next: check turn. It is "+i+", so I will go in." : (T.spinning ? "Waiting: " : "Next: check turn. ") + "turn = "+S.turn+", so it's "+D.names[S.turn]+"'s turn.";
+    if (ins.z === "cs") return "Inside. turn still says "+S.turn+".";
+    if (ins.z === "exit") return "About to give the turn to "+D.names[j]+".";
+    return "Doing other work.";
+  }
+  if (D.id === "alg2"){
+    if (T.pc === 0) return "About to raise my flag.";
+    if (T.pc === 1) return S.flag[j] ? (T.spinning ? "Waiting: " : "Next: check. ") + D.names[j]+"'s flag is up." : "Next: check. "+D.names[j]+"'s flag is down, so I can go in.";
+    if (ins.z === "cs") return "Inside. My flag is up.";
+    if (ins.z === "exit") return "About to lower my flag.";
+    return "Doing other work.";
+  }
+  if (D.id === "peterson"){
+    if (T.pc === 0) return "About to say: I want in.";
+    if (T.pc === 1) return "About to let "+D.names[j]+" go first.";
+    if (T.pc === 2) return (S.flag[j] && S.turn === j) ? (T.spinning ? "Waiting: " : "Next: test. ") + D.names[j]+" wants in and turn = "+j+"." : "Next: test. Free to go, because "+(S.flag[j] ? "turn = "+i : D.names[j]+" doesn't want in")+".";
+    if (ins.z === "cs") return "Inside the critical section.";
+    if (ins.z === "exit") return "About to lower my flag.";
+    return "Doing other work.";
+  }
+  if (D.id === "bakery"){
+    const ni = S.number[i];
+    if (T.pc === 0) return "Not interested yet.";
+    if (T.pc === 1) return "Choosing: about to read all tickets.";
+    if (T.pc === 2) return "Saw max = "+T.m+", so my ticket will be "+(T.m+1)+".";
+    if (T.pc === 3) return "Ticket "+ni+" written. About to finish choosing.";
+    if (T.pc === 4) return S.choosing[T.j] ? (T.spinning ? "Waiting: " : "Next: check "+D.names[T.j]+". ") + D.names[T.j]+" is still choosing." : "Next: check "+D.names[T.j]+". It is not choosing.";
+    if (T.pc === 5){ const nj = S.number[T.j]; return nj && less(nj, T.j, ni, i) ? (T.spinning ? "Waiting: " : "Next: compare. ") + D.names[T.j]+" has ("+nj+","+(T.j+1)+") < my ("+ni+","+(i+1)+")." : "Next: compare with "+D.names[T.j]+". I'm ahead of it."; }
+    if (ins.z === "cs") return "Inside with ticket "+ni+".";
+    return "Throwing my ticket away.";
+  }
+  return "";
+}
+
+function memHTML(D, st){
+  const S = st.S, ch = st.last ? st.last.changed : [], b = st.last ? st.last.before : null;
+  const cell = (n, v, c) => '<div class="cell'+(c ? " chg" : "")+'"><small>'+esc(n)+'</small><span>'+esc(v)+'</span></div>';
+  if (D.kind === "monitor") return '<div class="mem">' + cell("balance", S.balance, ch.includes("balance")) + cell("inside", S.owner === null ? "nobody" : D.names[S.owner], ch.includes("owner")) + cell("entry queue", S.entryQ.map(q => D.names[q]).join(", ") || "empty", ch.includes("entryQ")) + cell("funds queue", S.condQ.map(q => D.names[q]).join(", ") || "empty", ch.includes("condQ")) + '</div>';
+  if (D.id === "alg1") return '<div class="mem">' + cell("turn", S.turn, ch.includes("turn")) + '</div>';
+  if (D.id === "alg2") return '<div class="mem">' + cell("flag[0]", B(S.flag[0]), b && b.flag[0] !== S.flag[0]) + cell("flag[1]", B(S.flag[1]), b && b.flag[1] !== S.flag[1]) + '</div>';
+  if (D.id === "peterson") return '<div class="mem">' + cell("flag[0]", B(S.flag[0]), b && b.flag[0] !== S.flag[0]) + cell("flag[1]", B(S.flag[1]), b && b.flag[1] !== S.flag[1]) + cell("turn", S.turn, ch.includes("turn")) + '</div>';
+  if (D.id === "bakery"){
+    let h = '<table class="bk"><tr><th>process (id)</th>' + D.names.map((n,i) => '<th style="color:'+COLORS[i]+'">'+n+' ('+(i+1)+')</th>').join("") + '</tr>';
+    h += '<tr><th>choosing</th>' + S.choosing.map((c,i) => '<td class="'+(b && b.choosing[i] !== c ? "chg" : "")+'">'+(c ? "✍ true" : "false")+'</td>').join("") + '</tr>';
+    h += '<tr><th>number (ticket)</th>' + S.number.map((n,i) => '<td class="'+(b && b.number[i] !== n ? "chg" : "")+'" style="font-weight:700">'+(n || "0")+'</td>').join("") + '</tr></table>';
+    const q = S.number.map((n,i) => [n,i]).filter(p => p[0]).sort((a,b) => less(a[0],a[1],b[0],b[1]) ? -1 : 1);
+    h += '<div class="order">Service order by (ticket, id): ' + (q.length ? q.map(([n,i],k) => (k ? " → " : "") + '<b style="color:'+COLORS[i]+'">'+D.names[i]+'</b> ('+n+', '+(i+1)+')').join("") : "nobody holds a ticket") + '</div>';
+    return h;
+  }
+  return "";
+}
+
+function banner(D, st){
+  const n = D.n, all = [...Array(n).keys()];
+  const done = all.every(i => !st.P[i][st.Th[i].pc]);
+  if (D.kind === "monitor"){
+    if (done) return ["ok", "Finished: balance = "+st.S.balance+". One ATM inside at a time, and every update kept."];
+    return ["n", "Only one thread may be active inside the monitor. Count the tokens inside the big box."];
+  }
+  const inside = all.filter(i => zoneOf(st, i) === "cs");
+  if (inside.length > 1) return ["bad", "Mutual exclusion violated: " + inside.map(i => D.names[i]).join(" and ") + " are both inside."];
+  if (D.id === "alg2" && st.S.flag[0] && st.S.flag[1] && st.Th[0].pc === 1 && st.Th[1].pc === 1) return ["bad", "Deadlock: both flags are up and each thread waits for the other forever."];
+  if (D.id === "alg1"){ const w = all.find(i => st.Th[i].pc === 0 && st.Th[i].spinning); if (w !== undefined && !st.P[1-w][st.Th[1-w].pc] && !inside.length) return ["bad", "No progress: the critical section is empty and "+D.names[1-w]+" is not interested, but "+D.names[w]+" can never enter."]; }
+  if (done) return ["ok", "Finished: every entry completed, never more than one thread inside."];
+  return ["n", "Rule: at most one thread in the critical section (the green column)."];
+}
+
+function render(){
+  const D = DEMOS[demo];
+  const seq = D.tourSeq;
+  const h = mode === "tour" ? seq.slice(0, tstep) : hist;
+  const st = replay(D, h);
+  document.querySelectorAll(".ln").forEach(e => { e.className = "ln"; e.querySelector(".mk").innerHTML = ""; });
+  st.Th.forEach((T, i) => {
+    const ins = st.P[i][T.pc]; if (!ins) return;
+    const el = document.querySelector('.ln[data-n="'+ins.ln+'"]'); if (!el) return;
+    el.classList.add("on");
+    el.querySelector(".mk").insertAdjacentHTML("beforeend", '<span style="background:'+COLORS[i]+'">'+D.names[i]+(T.st === "sleep" ? "·z" : T.spinning ? "·…" : "")+'</span>');
+  });
+  if (st.last) st.last.ln.forEach(n => { const el = document.querySelector('.ln[data-n="'+n+'"]'); if (el) el.classList.add("ex"); });
+  const pos = place(D, st);
+  pos.forEach((p, i) => {
+    const t = $("tok"+i); if (!t) return;
+    t.style.left = p.x + "%"; t.style.top = p.y + "px";
+    t.classList.toggle("act", !!(st.last && st.last.me === i));
+    t.classList.toggle("spin", !!st.Th[i].spinning && st.P[i][st.Th[i].pc] !== undefined);
+    t.classList.toggle("sleep", st.Th[i].st === "sleep");
+    t.querySelector(".lb").textContent = p.lb || "";
+    t.querySelector(".lb").hidden = !p.lb;
+    const tk = t.querySelector(".tk"); if (tk){ tk.hidden = !p.ticket; tk.textContent = p.ticket ? "#"+p.ticket : ""; }
+  });
+  if (D.kind === "monitor"){
+    $("bal").textContent = "balance = " + st.S.balance;
+    $("bxData").classList.toggle("hot", !!(st.last && st.last.changed.includes("balance")));
+    $("bxCond").classList.toggle("hot", !!(st.last && st.last.changed.includes("condQ")));
+  } else {
+    const csz = $("z_cs"); if (csz) csz.classList.toggle("bad", D.names.filter((n,i) => zoneOf(st, i) === "cs").length > 1);
+  }
+  $("threads").innerHTML = D.names.map((n,i) => { const [lab, col] = statusOf(D, st, i); const T = st.Th[i];
+    const vars = D.kind === "monitor" ? D.jobs[i] : D.id === "bakery" ? "ticket " + st.S.number[i] + (T.pc >= 4 && T.pc <= 5 ? " · checking " + D.names[T.j] : "") + " · spins " + T.spins : D.id === "alg1" ? "entries " + T.k + " / " + (i === 0 ? 3 : 1) + " · spins " + T.spins : "rounds " + T.k + " / 2 · spins " + T.spins;
+    return '<div class="th" style="background:'+BGS[i]+';border-color:'+COLORS[i]+'"><div class="nm" style="color:'+COLORS[i]+'">'+n+'<span class="chip" style="color:'+col+';border:1px solid '+col+'">'+lab+'</span></div><div class="vars">'+esc(vars)+'</div><div class="think">"'+esc(think(D, st, i))+'"</div></div>'; }).join("");
+  const [bc, bt] = banner(D, st); $("banner").className = "banner " + bc; $("banner").textContent = bt;
+  $("mem").innerHTML = memHTML(D, st);
+  const isEnd = mode === "tour" && tstep === seq.length;
+  const note = mode === "tour" ? (D.notes[tstep] || (isEnd ? D.notes.end : null)) : (hist.length === 0 ? D.notes[0] : null);
+  let ex;
+  if (st.last){
+    const i = st.last.me;
+    ex = '<span class="tag" style="background:'+COLORS[i]+'">'+D.names[i]+' · step '+h.length+'</span><p>'+st.last.msg+'</p>' + (note ? '<div class="note">'+note+'</div>' : "");
+  } else ex = '<span class="tag" style="background:var(--ink);color:var(--bg)">'+esc(D.label)+'</span><p>'+(note || "")+'</p>' + (mode === "free" ? '<div class="note">You are the scheduler. Press a <b>Run</b> button to execute one step of that thread, in any order you like. Try to break the rules: two threads inside, a deadlock, or a thread that never gets in. You can also use the keys <kbd>1</kbd>–<kbd>'+D.n+'</kbd>.</div>' : "");
+  $("explain").innerHTML = ex;
+  $("log").innerHTML = st.log.slice().reverse().slice(0, 40).map(e => '<li><span class="st">'+e.idx+'</span><span class="who" style="background:'+COLORS[e.me]+'">'+D.names[e.me]+'</span><span>'+e.msg+'</span></li>').join("") || '<li><span class="hint">Nothing has run yet. Press Next, Play or a Run button.</span></li>';
+  if (mode === "tour"){
+    $("count").textContent = "step " + tstep + " / " + seq.length;
+    $("progress").style.width = (100*tstep/seq.length) + "%";
+    $("prev").disabled = tstep === 0; $("next").disabled = tstep === seq.length;
+  } else {
+    $("count").textContent = h.length + " step" + (h.length === 1 ? "" : "s") + " run";
+    $("progress").style.width = "0";
+    $("runBtns").querySelectorAll("button").forEach(b => { const i = +b.dataset.r; b.disabled = !runnable(st, i); b.title = st.Th[i].st === "sleep" ? D.names[i] + " is asleep and cannot run" : ""; });
+    $("runR").disabled = ![...Array(D.n).keys()].some(i => runnable(st, i)); $("undo").disabled = !hist.length;
+  }
+}
+
+function renderQuiz(){
+  $("quiz").innerHTML = QUIZ.map((q,k) => '<div class="q" data-k="'+k+'"><h3>'+(k+1)+'. '+esc(q.q)+'</h3><div class="opts">'+q.o.map((o,i) => '<button type="button" data-i="'+i+'">'+esc(o)+'</button>').join("")+'</div><div class="ans" hidden>'+q.e+'</div></div>').join("") + '<p class="hint">Each answer appears after you pick an option, just like the slide after each question.</p>';
+  $("quiz").querySelectorAll(".q").forEach(div => { const q = QUIZ[+div.dataset.k]; div.querySelectorAll("button").forEach(b => b.onclick = () => { div.querySelectorAll("button").forEach(x => x.classList.remove("right","wrong")); const i = +b.dataset.i; b.classList.add(i === q.a ? "right" : "wrong"); div.querySelectorAll("button")[q.a].classList.add("right"); div.querySelector(".ans").hidden = false; }); });
+}
+
+function stop(){ clearInterval(timer); timer = null; $("play").innerHTML = "&#9654; Play"; }
+function next(){ const D = DEMOS[demo]; if (tstep < D.tourSeq.length){ tstep++; render(); } else stop(); }
+function play(){ if (timer){ stop(); return; } if (tstep === DEMOS[demo].tourSeq.length){ tstep = 0; render(); } $("play").innerHTML = "&#10074;&#10074; Pause"; timer = setInterval(next, +$("speed").value); }
+function setMode(m){ stop(); mode = m; $("mTour").setAttribute("aria-pressed", m === "tour"); $("mFree").setAttribute("aria-pressed", m === "free"); $("tourCtl").hidden = m !== "tour"; $("freeCtl").hidden = m !== "free"; render(); }
+function runT(i){ const D = DEMOS[demo]; const st = replay(D, hist); if (runnable(st, i)){ hist.push(i); render(); } }
+
+$("mTour").onclick = () => setMode("tour"); $("mFree").onclick = () => setMode("free");
+$("next").onclick = () => { stop(); next(); };
+$("prev").onclick = () => { stop(); if (tstep > 0){ tstep--; render(); } };
+$("reset").onclick = () => { stop(); tstep = 0; render(); };
+$("play").onclick = play;
+$("speed").onchange = () => { if (timer){ stop(); play(); } };
+$("runR").onclick = () => { const D = DEMOS[demo]; const st = replay(D, hist); const c = [...Array(D.n).keys()].filter(i => runnable(st, i)); if (c.length){ hist.push(c[Math.floor(Math.random()*c.length)]); render(); } };
+$("undo").onclick = () => { hist.pop(); render(); };
+$("freset").onclick = () => { hist = []; render(); };
+document.addEventListener("keydown", e => {
+  const D = DEMOS[demo]; if (D.kind === "quiz" || e.target.closest("select")) return;
+  if (mode === "tour"){
+    if (e.key === "ArrowRight"){ stop(); next(); e.preventDefault(); }
+    else if (e.key === "ArrowLeft"){ stop(); if (tstep > 0){ tstep--; render(); } e.preventDefault(); }
+    else if (e.key === " " && !e.target.closest("button")){ play(); e.preventDefault(); }
+  } else if (/^[1-4]$/.test(e.key) && +e.key <= D.n){ runT(+e.key - 1); }
+  else if (e.key === "Backspace"){ hist.pop(); render(); e.preventDefault(); }
+});
+$("theme").onclick = () => { const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark ? "light" : "dark"; try{ localStorage.setItem("ma-theme", r.dataset.theme); }catch(e){} };
+try{ const t = localStorage.getItem("ma-theme"); if (t) document.documentElement.dataset.theme = t; }catch(e){}
+const start = DEMOS.findIndex(d => d.id === location.hash.slice(1));
+select(start >= 0 ? start : 0);
+</script>
+</body>
+</html>
