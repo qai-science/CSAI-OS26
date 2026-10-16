@@ -1,0 +1,4 @@
+$ ./cli_demo
+user program: trying to disable interrupts with cli ...
+the CPU refused: cli is a privileged instruction (signal 11, SIGSEGV)
+only the kernel, in ring 0, may disable interrupts

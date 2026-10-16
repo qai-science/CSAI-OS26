@@ -1,0 +1,3 @@
+$ ./prodcons_inout
+consumer: received 2000000 items in order, 0 out of order
+buffer has 8 slots, most items ever held at once = 7

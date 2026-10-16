@@ -1,0 +1,6 @@
+.DS_Store
+code/*
+!code/*.c
+!code/*.h
+!code/Makefile
+!code/run_all.sh

@@ -1,0 +1,3 @@
+$ ./ipc_bench
+shared memory : 100 MB in  360.8 ms  (one copy into the shared region, kernel only at set-up)
+pipe (kernel) : 100 MB in  530.2 ms  (1600 read() system calls, two copies per byte)

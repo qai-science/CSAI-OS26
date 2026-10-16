@@ -1,0 +1,4 @@
+$ ./dining
+DEADLOCK after 0 meals: every philosopher holds one chopstick and waits for the next
+$ ./dining ordered
+ordered: no deadlock in 6 s, meals per philosopher: P0=103 P1=489 P2=1120 P3=1707 P4=2596

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit III Visual Lab</title>
+<meta name="description" content="CSEG2060 Operating Systems, Unit III: every topic from IPC to the classic synchronisation problems as a step-by-step visual simulation, with real Linux programs and worked numericals.">
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><b>Unit III Visual Lab</b><span>CSEG2060 Operating Systems</span></div>
+    <label class="mobsel"><span>Topic</span><select id="topicSel"></select></label>
+    <nav id="nav"></nav>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <div>
+        <div class="crumb" id="crumb"></div>
+        <h1 id="title"></h1>
+        <p class="lead" id="lead"></p>
+      </div>
+      <button class="theme" id="theme" type="button" aria-label="Toggle colour theme">Theme</button>
+    </header>
+
+    <div id="simUI">
+      <div class="bar">
+        <div class="seg" role="group" aria-label="Mode" id="modeSeg">
+          <button type="button" id="mTour" aria-pressed="true">Guided tour</button>
+          <button type="button" id="mFree" aria-pressed="false">You are the scheduler</button>
+        </div>
+        <div class="grp" id="tourCtl">
+          <button id="reset" type="button" title="Back to the start (Home)" aria-label="Back to the start">&#x23EE;</button>
+          <button id="prev" type="button" title="Previous step (Left arrow)">&#9664; Prev</button>
+          <button id="play" class="primary" type="button" title="Play / pause (Space)">&#9654; Play</button>
+          <button id="next" type="button" title="Next step (Right arrow)">Next &#9654;</button>
+          <select id="speed" aria-label="Speed"><option value="3000">Slow</option><option value="1700" selected>Normal</option><option value="850">Fast</option></select>
+        </div>
+        <div class="grp" id="freeCtl" hidden>
+          <span id="runBtns" class="grp"></span>
+          <button id="runR" type="button">Random</button>
+          <button id="undo" type="button">Undo</button>
+          <button id="freset" type="button">Reset</button>
+        </div>
+        <span id="optBox" class="grp"></span>
+        <span class="count" id="count"></span>
+        <div class="prog"><i id="progress"></i></div>
+      </div>
+
+      <div class="grid">
+        <div class="col">
+          <section class="card" id="phaseCard">
+            <h2><span>The process, step by step</span><span class="hint2">click a step to jump there</span></h2>
+            <ol class="phases" id="phases"></ol>
+          </section>
+          <section class="card" id="codeCard">
+            <h2><span>Code (coloured tag = next line for that process)</span><a id="srclink" href="#" target="_blank" rel="noopener"></a></h2>
+            <div class="code" id="code"></div>
+          </section>
+        </div>
+        <div class="col">
+          <section class="card">
+            <h2><span id="stageTitle">What is happening</span><span class="hint2" id="stageHint"></span></h2>
+            <div id="stageWrap"><div class="stage" id="stage"></div></div>
+            <div class="threads" id="threads"></div>
+            <p class="banner n" id="banner"></p>
+          </section>
+          <section class="card">
+            <h2><span>This step, explained</span></h2>
+            <div class="explain" id="explain" aria-live="polite"></div>
+          </section>
+          <section class="card">
+            <h2><span>Live narration (newest first)</span></h2>
+            <ol class="log" id="log"></ol>
+          </section>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="term" id="realBox"><div class="tb"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span id="realTitle">Real run on the Ubuntu VM</span></div><pre id="real"></pre></div>
+        <section class="card" id="propCard"><h2><span id="propTitle">Requirements check</span></h2><div class="props" id="props"></div></section>
+      </div>
+      <section class="card deep"><h2><span id="deepTitle">In depth</span></h2><div class="body" id="deep"></div></section>
+    </div>
+
+    <section class="card deep" id="pageUI" hidden><div class="body" id="page"></div></section>
+
+    <footer>Every simulation follows the slides of CSEG2060 Unit III (topics 3.1 to 3.16). The C programs in <code>code/</code> build with <code>make</code> on Linux; the outputs shown are real runs on an Ubuntu 26.04 VM.</footer>
+  </main>
+</div>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

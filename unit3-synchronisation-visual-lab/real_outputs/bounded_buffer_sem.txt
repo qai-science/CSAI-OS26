@@ -1,0 +1,6 @@
+$ ./bounded_buffer_sem
+consumer: got all 1000000 items, 0 out of order
+correct order: finished, mutex = 1, empty = 8, full = 0 again
+$ ./bounded_buffer_sem wrong
+DEADLOCK (wrong order) after 8 produced, 0 consumed: mutex = 0, empty = 0, full = 7
+the producer holds mutex and sleeps on empty; the consumer sleeps on mutex

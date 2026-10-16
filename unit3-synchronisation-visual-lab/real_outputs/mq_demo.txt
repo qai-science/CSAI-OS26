@@ -1,0 +1,13 @@
+$ ./mq_demo
+[    0 ms] sender  : send "job-1"
+[    0 ms] sender  : "job-1" is in the mailbox
+[    0 ms] sender  : send "job-2"
+[    0 ms] sender  : "job-2" is in the mailbox
+[    0 ms] sender  : send "job-3"
+[ 1342 ms] sender  : "job-3" is in the mailbox
+[ 1342 ms] receiver: got  "job-1"
+[ 1343 ms] sender  : send "job-4"
+[ 2399 ms] receiver: got  "job-2"
+[ 2400 ms] sender  : "job-4" is in the mailbox
+[ 4496 ms] receiver: got  "job-3"
+[ 6221 ms] receiver: got  "job-4"

@@ -1,0 +1,6 @@
+$ ./race_count
+run 1: count = 618739  (should be 5)
+run 2: count = 44571  (should be 5)
+run 3: count = -570649  (should be 5)
+run 4: count = 680596  (should be 5)
+run 5: count = 875362  (should be 5)

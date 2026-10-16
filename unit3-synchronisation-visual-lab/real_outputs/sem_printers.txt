@@ -1,0 +1,13 @@
+$ ./sem_printers
+[    0 ms] job 1: printing   (free printers now 2)
+[   21 ms] job 2: printing   (free printers now 1)
+[   50 ms] job 3: printing   (free printers now 0)
+[ 1077 ms] job 3: done
+[ 1078 ms] job 4: printing   (free printers now 0)
+[ 1094 ms] job 1: done
+[ 1097 ms] job 5: printing   (free printers now 0)
+[ 1104 ms] job 2: done
+[ 1105 ms] job 6: printing   (free printers now 0)
+[ 2089 ms] job 4: done
+[ 2098 ms] job 5: done
+[ 2107 ms] job 6: done

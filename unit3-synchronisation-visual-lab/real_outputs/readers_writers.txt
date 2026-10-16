@@ -1,0 +1,4 @@
+$ ./readers_writers
+[    20 ms] writer: wants to write
+[  3020 ms] after 3 s: up to 4 readers read together; stopping the readers
+[  3025 ms] writer: WRITING (alone)
